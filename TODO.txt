@@ -1,0 +1,9 @@
+1. initialisiere ein Git und erstelle passende Commits während der Entwicklung
+
+2. ich möchte dass beim Installationsprozess von Elektron nach dem Speicherort für die Daten gefragt wird. Beschreibe auch dem Nutzer einen Aussagekräftigen text. 
+
+3. stelle sicher dass die datenhaltung migrierbar ist. wenn ich also eine neue version von luna starte möchte ich, dass ggf eine Datenmigration durchgeführt wird. je nach dem ob das nötig ist.
+
+4. wie können wir einen update Prozess sicherstellen? ich könnte die app bspw. in Github publishen und von dort könnte man sich doch neue Releases mit updates installieren oder denke ich da zu einfach? 
+
+5. Ich brauche Integrationen von anderen Applikationen. Bspw. planio.com. Als Beispiel für dich zur Analyse schaue einmal auf https://dentalmanagement.planio.com. Das hier ist der Api schlüssel.  Importiere bestehende Tickets. Es gibt auch Buchungen in dem System. Biete einen separaten Knopf an über den die Tickets importiet werden können. Dabei soll es auch eine Checkbox geben ob die dazugehörigen Buchungen importiert werden sollen. Die Kommentarspalte daraus soll für die Abrechnungszelle dienen. Die Verbindung gehört immer zu einem Kunden biete also auf der Kundenseite eine Möglichkeit an den Api Key zu PlanIO zu hinterlegen und biete dann verschiedene Knöpfe an. einmal Tickets importieren, dann Tickets inkl. Buchungen importieren, Nur Buchungen importieren (referenzierte Tickets automatisch anlegen) dabei ist immer die Ticket nummer wichtig
