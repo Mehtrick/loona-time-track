@@ -1,5 +1,4 @@
 import { app, BrowserWindow, dialog, Menu, ipcMain } from 'electron';
-import { autoUpdater } from 'electron-updater';
 import { createApp } from '../server/app.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -246,8 +245,21 @@ app.on('window-all-closed', () => {
 });
 
 // === AUTO-UPDATER ===
-function setupAutoUpdater() {
+// Dynamischer Import: electron-updater ist ein CJS-Paket dessen autoUpdater
+// nur über den default-Export erreichbar ist. Lazy-Import verhindert außerdem
+// Fehler im Dev-Modus, wo electron-updater keine app-update.yml findet.
+async function setupAutoUpdater() {
   if (isDev) return; // Kein Update-Check im Dev-Modus
+
+  let autoUpdater;
+  try {
+    const updaterModule = await import('electron-updater');
+    autoUpdater = updaterModule.default?.autoUpdater ?? updaterModule.autoUpdater;
+    if (!autoUpdater) throw new Error('autoUpdater nicht gefunden');
+  } catch (err) {
+    console.error('electron-updater konnte nicht geladen werden:', err.message);
+    return;
+  }
 
   autoUpdater.autoDownload = false; // Erst fragen, dann laden
 
@@ -264,9 +276,7 @@ function setupAutoUpdater() {
       buttons: ['Jetzt herunterladen', 'Später'],
       defaultId: 0,
     }).then(({ response }) => {
-      if (response === 0) {
-        autoUpdater.downloadUpdate();
-      }
+      if (response === 0) autoUpdater.downloadUpdate();
     });
   });
 
@@ -279,9 +289,7 @@ function setupAutoUpdater() {
       buttons: ['Jetzt neu starten', 'Später'],
       defaultId: 0,
     }).then(({ response }) => {
-      if (response === 0) {
-        autoUpdater.quitAndInstall();
-      }
+      if (response === 0) autoUpdater.quitAndInstall();
     });
   });
 
@@ -289,7 +297,6 @@ function setupAutoUpdater() {
     console.error('Update-Fehler:', err);
   });
 
-  // Einmal täglich auf Updates prüfen
   autoUpdater.checkForUpdatesAndNotify();
 }
 
