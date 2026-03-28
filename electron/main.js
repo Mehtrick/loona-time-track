@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, Menu, ipcMain } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import { createApp } from '../server/app.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -36,12 +37,30 @@ function getDefaultDataPath() {
   return join(app.getPath('userData'), 'luna-data.json');
 }
 
-async function askForDataPath(parentWindow) {
+async function askForDataPath(parentWindow, isFirstStart = false) {
   const defaultPath = getDefaultDataPath();
   const defaultDir = dirname(defaultPath);
 
+  if (isFirstStart) {
+    await dialog.showMessageBox(parentWindow || null, {
+      type: 'info',
+      title: 'Willkommen bei Luna 🌙',
+      message: 'Willkommen bei Luna – deiner persönlichen Zeiterfassung!',
+      detail:
+        'Luna speichert alle deine Daten lokal auf deinem Rechner – ' +
+        'keine Cloud, kein Server, alles bei dir.\n\n' +
+        'Bitte wähle im nächsten Schritt einen Ordner, in dem Luna ' +
+        'deine Zeiteinträge, Kunden und Tickets ablegen soll.\n\n' +
+        'Tipp: Wähle einen Ordner, der regelmäßig gesichert wird ' +
+        '(z. B. in deiner Dropbox oder auf einem Netzlaufwerk), ' +
+        'damit deine Daten sicher sind.',
+      buttons: ['Weiter'],
+      defaultId: 0,
+    });
+  }
+
   const result = await dialog.showOpenDialog(parentWindow || null, {
-    title: 'Luna - Datenspeicherort wählen',
+    title: 'Luna – Datenspeicherort wählen',
     message: 'Wähle den Ordner, in dem Luna deine Daten speichern soll.',
     defaultPath: defaultDir,
     properties: ['openDirectory', 'createDirectory'],
@@ -202,9 +221,9 @@ app.whenReady().then(async () => {
   const settings = loadSettings();
   let dataPath = settings.dataPath;
 
-  // First start: ask for data path
+  // First start: show welcome dialog then ask for data path
   if (!dataPath) {
-    dataPath = await askForDataPath(null);
+    dataPath = await askForDataPath(null, true);
     settings.dataPath = dataPath;
     saveSettings(settings);
   }
@@ -218,12 +237,61 @@ app.whenReady().then(async () => {
   const port = await startServer(dataPath);
   buildMenu();
   createWindow(port);
+  setupAutoUpdater();
 });
 
 app.on('window-all-closed', () => {
   if (server) server.close();
   app.quit();
 });
+
+// === AUTO-UPDATER ===
+function setupAutoUpdater() {
+  if (isDev) return; // Kein Update-Check im Dev-Modus
+
+  autoUpdater.autoDownload = false; // Erst fragen, dann laden
+
+  autoUpdater.on('update-available', (info) => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update verfügbar',
+      message: `Luna ${info.version} ist verfügbar!`,
+      detail:
+        'Eine neue Version von Luna steht bereit. ' +
+        'Möchtest du jetzt aktualisieren?\n\n' +
+        'Das Update wird im Hintergrund heruntergeladen ' +
+        'und beim nächsten Start installiert.',
+      buttons: ['Jetzt herunterladen', 'Später'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.downloadUpdate();
+      }
+    });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update bereit',
+      message: 'Update heruntergeladen',
+      detail: 'Das Update wurde heruntergeladen. Luna wird jetzt neu gestartet und aktualisiert.',
+      buttons: ['Jetzt neu starten', 'Später'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Update-Fehler:', err);
+  });
+
+  // Einmal täglich auf Updates prüfen
+  autoUpdater.checkForUpdatesAndNotify();
+}
 
 app.on('activate', () => {
   if (mainWindow === null && serverPort) {
