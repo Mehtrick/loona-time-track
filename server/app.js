@@ -340,6 +340,25 @@ export function createApp(dataFilePath) {
     return items;
   }
 
+  async function planioGetCurrentUserId(baseUrl, apiKey) {
+    const url = `${baseUrl.replace(/\/$/, '')}/my/account.json`;
+    const res = await fetch(url, { headers: { 'X-Redmine-API-Key': apiKey } });
+    if (!res.ok) throw new Error(`Planio API ${res.status}: ${res.statusText}`);
+    const json = await res.json();
+    return json.user?.id ?? null;
+  }
+
+  // Maps a Planio time entry to Luna entry fields.
+  // If comments contain "Abgerechnet" → billed field; otherwise → description field.
+  function mapEntryFields(te) {
+    const comment = te.comments || '';
+    const isAbgerechnet = /abgerechnet/i.test(comment);
+    return {
+      description: isAbgerechnet ? (te.activity?.name || '') : (comment || te.activity?.name || ''),
+      billed: isAbgerechnet ? comment : '',
+    };
+  }
+
   // GET /api/planio/preview?client_id=X
   app.get('/api/planio/preview', async (req, res) => {
     const data = loadData();
@@ -351,9 +370,13 @@ export function createApp(dataFilePath) {
     }
 
     try {
+      // Fetch current user so we only count their own time entries
+      const userId = await planioGetCurrentUserId(client.planio_url, client.planio_api_key);
+      const userParam = userId ? `&user_id=${userId}` : '';
+
       const [issues, timeEntries] = await Promise.all([
         planioFetchAll(client.planio_url, client.planio_api_key, 'issues', '&status_id=*'),
-        planioFetchAll(client.planio_url, client.planio_api_key, 'time_entries'),
+        planioFetchAll(client.planio_url, client.planio_api_key, 'time_entries', userParam),
       ]);
 
       const existingTicketIds = new Set(
@@ -389,6 +412,12 @@ export function createApp(dataFilePath) {
     }
 
     try {
+      // Fetch current user so we only import their own time entries
+      const userId = import_entries
+        ? await planioGetCurrentUserId(client.planio_url, client.planio_api_key)
+        : null;
+      const userParam = userId ? `&user_id=${userId}` : '';
+
       // Always fetch issues when importing entries (needed to resolve ticket references)
       const fetchIssues = import_tickets || import_entries;
       const [issues, timeEntries] = await Promise.all([
@@ -396,7 +425,7 @@ export function createApp(dataFilePath) {
           ? planioFetchAll(client.planio_url, client.planio_api_key, 'issues', '&status_id=*')
           : Promise.resolve([]),
         import_entries
-          ? planioFetchAll(client.planio_url, client.planio_api_key, 'time_entries')
+          ? planioFetchAll(client.planio_url, client.planio_api_key, 'time_entries', userParam)
           : Promise.resolve([]),
       ]);
 
@@ -440,7 +469,6 @@ export function createApp(dataFilePath) {
               t => t.planio_id === te.issue.id && t.client_id === clientId
             );
             if (!ticket) {
-              // Auto-create ticket from issue data (or a stub if issue wasn't fetched)
               const issue = issues.find(i => i.id === te.issue.id);
               ticket = {
                 id: data.nextId.tickets++,
@@ -459,6 +487,7 @@ export function createApp(dataFilePath) {
             ticketId = ticket.id;
           }
 
+          const { description, billed } = mapEntryFields(te);
           const entry = {
             id: data.nextId.entries++,
             client_id: clientId,
@@ -466,9 +495,8 @@ export function createApp(dataFilePath) {
             ticket_id: ticketId,
             date: te.spent_on,
             hours: te.hours,
-            // Planio comments = work description; billed stays empty (user bills via Luna)
-            description: te.comments || te.activity?.name || '',
-            billed: '',
+            description,
+            billed,
             created_at: te.created_on || now(),
           };
           data.entries.push(entry);
