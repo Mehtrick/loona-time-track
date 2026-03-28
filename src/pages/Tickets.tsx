@@ -97,7 +97,7 @@ export default function Tickets() {
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-luna-600 hover:bg-luna-500 text-white rounded-xl text-sm font-medium transition-luna luna-glow-hover"
+            className="flex items-center gap-2 px-4 py-2.5 bg-loona-600 hover:bg-loona-500 text-white rounded-xl text-sm font-medium transition-loona loona-glow-hover"
           >
             <Plus size={16} />
             Neues Ticket
@@ -118,7 +118,7 @@ export default function Tickets() {
               <select
                 value={clientId}
                 onChange={e => setClientId(Number(e.target.value))}
-                className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna"
+                className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
                 required
               >
                 <option value="">Kunde auswählen...</option>
@@ -135,7 +135,7 @@ export default function Tickets() {
                 value={reference}
                 onChange={e => setReference(e.target.value)}
                 placeholder="z.B. PROJ-001"
-                className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna"
+                className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
                 required
               />
             </div>
@@ -148,7 +148,7 @@ export default function Tickets() {
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Ticket-Bezeichnung..."
-              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna"
+              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
               required
             />
           </div>
@@ -160,14 +160,14 @@ export default function Tickets() {
               onChange={e => setDescription(e.target.value)}
               rows={2}
               placeholder="Beschreibung..."
-              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna resize-none"
+              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona resize-none"
             />
           </div>
 
           <div className="flex gap-2">
             <button
               type="submit"
-              className="flex items-center gap-2 px-4 py-2.5 bg-luna-600 hover:bg-luna-500 text-white rounded-xl text-sm font-medium transition-luna"
+              className="flex items-center gap-2 px-4 py-2.5 bg-loona-600 hover:bg-loona-500 text-white rounded-xl text-sm font-medium transition-loona"
             >
               <Check size={16} />
               {editId ? 'Speichern' : 'Anlegen'}
@@ -175,7 +175,7 @@ export default function Tickets() {
             <button
               type="button"
               onClick={resetForm}
-              className="flex items-center gap-2 px-4 py-2.5 bg-night-800 hover:bg-night-700 text-night-300 rounded-xl text-sm font-medium transition-luna"
+              className="flex items-center gap-2 px-4 py-2.5 bg-night-800 hover:bg-night-700 text-night-300 rounded-xl text-sm font-medium transition-loona"
             >
               <X size={16} />
               Abbrechen
@@ -189,7 +189,7 @@ export default function Tickets() {
         <select
           value={filterClient}
           onChange={e => setFilterClient(e.target.value ? Number(e.target.value) : '')}
-          className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-luna-500"
+          className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-loona-500"
         >
           <option value="">Alle Kunden</option>
           {clients.map(c => (
@@ -199,9 +199,9 @@ export default function Tickets() {
 
         <button
           onClick={() => setShowInactive(!showInactive)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-luna border ${
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-loona border ${
             showInactive
-              ? 'border-luna-500 bg-luna-600/20 text-luna-200'
+              ? 'border-loona-500 bg-loona-600/20 text-loona-200'
               : 'border-night-600/50 bg-night-800 text-night-400 hover:text-white'
           }`}
         >
@@ -220,7 +220,7 @@ export default function Tickets() {
           ) : (
             <button
               onClick={() => setShowForm(true)}
-              className="px-4 py-2.5 bg-luna-600 hover:bg-luna-500 text-white rounded-xl text-sm font-medium transition-luna"
+              className="px-4 py-2.5 bg-loona-600 hover:bg-loona-500 text-white rounded-xl text-sm font-medium transition-loona"
             >
               Erstes Ticket anlegen
             </button>
@@ -244,14 +244,14 @@ export default function Tickets() {
                 {clientTickets.map(ticket => (
                   <div
                     key={ticket.id}
-                    className={`bg-night-900 rounded-xl border px-5 py-3.5 flex items-center justify-between group transition-luna ${
+                    className={`bg-night-900 rounded-xl border px-5 py-3.5 flex items-center justify-between group transition-loona ${
                       ticket.active
                         ? 'border-night-700/50 hover:border-night-600'
                         : 'border-night-800/50 opacity-50'
                     }`}
                   >
                     <div className="flex items-center gap-4">
-                      <span className="px-2.5 py-0.5 bg-night-800 rounded-md text-xs font-mono text-luna-200 font-medium">
+                      <span className="px-2.5 py-0.5 bg-night-800 rounded-md text-xs font-mono text-loona-200 font-medium">
                         {ticket.reference}
                       </span>
                       <div>
@@ -261,10 +261,10 @@ export default function Tickets() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-luna">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-loona">
                       <button
                         onClick={() => toggleActive(ticket)}
-                        className={`p-2 rounded-lg transition-luna ${
+                        className={`p-2 rounded-lg transition-loona ${
                           ticket.active
                             ? 'text-night-400 hover:text-amber-400 hover:bg-night-800'
                             : 'text-night-400 hover:text-emerald-400 hover:bg-night-800'
@@ -275,13 +275,13 @@ export default function Tickets() {
                       </button>
                       <button
                         onClick={() => startEdit(ticket)}
-                        className="p-2 rounded-lg text-night-400 hover:text-white hover:bg-night-800 transition-luna"
+                        className="p-2 rounded-lg text-night-400 hover:text-white hover:bg-night-800 transition-loona"
                       >
                         <Pencil size={14} />
                       </button>
                       <button
                         onClick={() => handleDelete(ticket.id)}
-                        className="p-2 rounded-lg text-night-400 hover:text-red-400 hover:bg-night-800 transition-luna"
+                        className="p-2 rounded-lg text-night-400 hover:text-red-400 hover:bg-night-800 transition-loona"
                       >
                         <Trash2 size={14} />
                       </button>

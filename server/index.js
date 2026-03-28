@@ -6,7 +6,7 @@ import express from 'express';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const dataFile = join(__dirname, '..', 'luna-data.json');
+const dataFile = join(__dirname, '..', 'loona-data.json');
 const app = createApp(dataFile);
 
 // Serve built frontend only when dist/ exists (production standalone mode)
@@ -21,5 +21,5 @@ if (existsSync(join(distPath, 'index.html'))) {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`🌙 Luna Server läuft auf http://localhost:${PORT}`);
+  console.log(`🌙 Loona Server läuft auf http://localhost:${PORT}`);
 });

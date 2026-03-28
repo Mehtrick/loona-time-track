@@ -26,10 +26,10 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-night-900 rounded-2xl p-6 border border-night-700/50 luna-glow">
+        <div className="bg-night-900 rounded-2xl p-6 border border-night-700/50 loona-glow">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-luna-600/20 flex items-center justify-center">
-              <Clock size={20} className="text-luna-300" />
+            <div className="w-10 h-10 rounded-xl bg-loona-600/20 flex items-center justify-center">
+              <Clock size={20} className="text-loona-300" />
             </div>
             <span className="text-night-300 text-sm">Offene Stunden</span>
           </div>
@@ -98,7 +98,7 @@ export default function Dashboard() {
           <h3 className="text-lg font-semibold text-white">Letzte Buchungen</h3>
           <Link
             to="/buchungen"
-            className="text-sm text-luna-300 hover:text-luna-200 flex items-center gap-1 transition-luna"
+            className="text-sm text-loona-300 hover:text-loona-200 flex items-center gap-1 transition-loona"
           >
             Alle anzeigen <ArrowRight size={14} />
           </Link>
@@ -110,7 +110,7 @@ export default function Dashboard() {
             <p className="text-night-400">Noch keine Buchungen vorhanden</p>
             <Link
               to="/erfassen"
-              className="inline-block mt-4 px-4 py-2 bg-luna-600 hover:bg-luna-500 text-white rounded-lg text-sm transition-luna"
+              className="inline-block mt-4 px-4 py-2 bg-loona-600 hover:bg-loona-500 text-white rounded-lg text-sm transition-loona"
             >
               Erste Stunden erfassen
             </Link>
@@ -162,16 +162,16 @@ export default function Dashboard() {
       {/* Empty state for new users */}
       {summary.length === 0 && (
         <div className="bg-night-900 rounded-2xl border border-night-700/50 p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-luna-300 to-luna-600 flex items-center justify-center mx-auto mb-6">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-loona-300 to-loona-600 flex items-center justify-center mx-auto mb-6">
             <Tag size={32} className="text-white" />
           </div>
-          <h3 className="text-xl font-semibold text-white mb-2">Willkommen bei Luna!</h3>
+          <h3 className="text-xl font-semibold text-white mb-2">Willkommen bei Loona!</h3>
           <p className="text-night-300 mb-6 max-w-md mx-auto">
             Starte damit, deinen ersten Kunden anzulegen. Danach kannst du Tickets erstellen und Stunden buchen.
           </p>
           <Link
             to="/kunden"
-            className="inline-block px-6 py-3 bg-luna-600 hover:bg-luna-500 text-white rounded-xl font-medium transition-luna luna-glow-hover"
+            className="inline-block px-6 py-3 bg-loona-600 hover:bg-loona-500 text-white rounded-xl font-medium transition-loona loona-glow-hover"
           >
             Ersten Kunden anlegen
           </Link>

@@ -11,7 +11,7 @@ const __dirname = dirname(__filename);
 const isDev = !app.isPackaged;
 
 // Settings management
-const settingsPath = join(app.getPath('userData'), 'luna-settings.json');
+const settingsPath = join(app.getPath('userData'), 'loona-settings.json');
 
 function loadSettings() {
   if (!existsSync(settingsPath)) return {};
@@ -33,7 +33,7 @@ let server = null;
 let serverPort = null;
 
 function getDefaultDataPath() {
-  return join(app.getPath('userData'), 'luna-data.json');
+  return join(app.getPath('userData'), 'loona-data.json');
 }
 
 async function askForDataPath(parentWindow, isFirstStart = false) {
@@ -43,12 +43,12 @@ async function askForDataPath(parentWindow, isFirstStart = false) {
   if (isFirstStart) {
     await dialog.showMessageBox(parentWindow || null, {
       type: 'info',
-      title: 'Willkommen bei Luna 🌙',
-      message: 'Willkommen bei Luna – deiner persönlichen Zeiterfassung!',
+      title: 'Willkommen bei Loona 🌙',
+      message: 'Willkommen bei Loona – deiner persönlichen Zeiterfassung!',
       detail:
-        'Luna speichert alle deine Daten lokal auf deinem Rechner – ' +
+        'Loona speichert alle deine Daten lokal auf deinem Rechner – ' +
         'keine Cloud, kein Server, alles bei dir.\n\n' +
-        'Bitte wähle im nächsten Schritt einen Ordner, in dem Luna ' +
+        'Bitte wähle im nächsten Schritt einen Ordner, in dem Loona ' +
         'deine Zeiteinträge, Kunden und Tickets ablegen soll.\n\n' +
         'Tipp: Wähle einen Ordner, der regelmäßig gesichert wird ' +
         '(z. B. in deiner Dropbox oder auf einem Netzlaufwerk), ' +
@@ -59,8 +59,8 @@ async function askForDataPath(parentWindow, isFirstStart = false) {
   }
 
   const result = await dialog.showOpenDialog(parentWindow || null, {
-    title: 'Luna – Datenspeicherort wählen',
-    message: 'Wähle den Ordner, in dem Luna deine Daten speichern soll.',
+    title: 'Loona – Datenspeicherort wählen',
+    message: 'Wähle den Ordner, in dem Loona deine Daten speichern soll.',
     defaultPath: defaultDir,
     properties: ['openDirectory', 'createDirectory'],
     buttonLabel: 'Ordner auswählen',
@@ -70,7 +70,7 @@ async function askForDataPath(parentWindow, isFirstStart = false) {
     return defaultPath;
   }
 
-  return join(result.filePaths[0], 'luna-data.json');
+  return join(result.filePaths[0], 'loona-data.json');
 }
 
 function startServer(dataPath) {
@@ -92,7 +92,7 @@ function startServer(dataPath) {
   return new Promise((resolve) => {
     server = expressApp.listen(0, '127.0.0.1', () => {
       serverPort = server.address().port;
-      console.log(`🌙 Luna Server auf Port ${serverPort}`);
+      console.log(`🌙 Loona Server auf Port ${serverPort}`);
       resolve(serverPort);
     });
   });
@@ -104,7 +104,7 @@ function createWindow(port) {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'Luna',
+    title: 'Loona',
     icon: join(__dirname, '..', 'build', 'icon.png'),
     backgroundColor: '#090c17',
     webPreferences: {
@@ -135,7 +135,7 @@ function createWindow(port) {
 function buildMenu() {
   const template = [
     {
-      label: 'Luna',
+      label: 'Loona',
       submenu: [
         {
           label: 'Datenpfad ändern...',
@@ -161,7 +161,7 @@ function buildMenu() {
               dialog.showMessageBox(mainWindow, {
                 type: 'info',
                 title: 'Datenpfad geändert',
-                message: `Luna speichert jetzt unter:\n${newPath}`,
+                message: `Loona speichert jetzt unter:\n${newPath}`,
               });
             }
           },
@@ -267,9 +267,9 @@ async function setupAutoUpdater() {
     dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: 'Update verfügbar',
-      message: `Luna ${info.version} ist verfügbar!`,
+      message: `Loona ${info.version} ist verfügbar!`,
       detail:
-        'Eine neue Version von Luna steht bereit. ' +
+        'Eine neue Version von Loona steht bereit. ' +
         'Möchtest du jetzt aktualisieren?\n\n' +
         'Das Update wird im Hintergrund heruntergeladen ' +
         'und beim nächsten Start installiert.',
@@ -285,7 +285,7 @@ async function setupAutoUpdater() {
       type: 'info',
       title: 'Update bereit',
       message: 'Update heruntergeladen',
-      detail: 'Das Update wurde heruntergeladen. Luna wird jetzt neu gestartet und aktualisiert.',
+      detail: 'Das Update wurde heruntergeladen. Loona wird jetzt neu gestartet und aktualisiert.',
       buttons: ['Jetzt neu starten', 'Später'],
       defaultId: 0,
     }).then(({ response }) => {

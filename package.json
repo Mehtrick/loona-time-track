@@ -1,7 +1,7 @@
 {
-  "name": "luna",
+  "name": "loona",
   "version": "1.0.0",
-  "description": "Luna - Zeiterfassung für Freelancer",
+  "description": "Loona - Zeiterfassung für Freelancer",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -42,8 +42,8 @@
     "vitest": "^4.1.2"
   },
   "build": {
-    "appId": "com.luna.timetrack",
-    "productName": "Luna",
+    "appId": "com.loona.timetrack",
+    "productName": "Loona",
     "directories": {
       "output": "release"
     },
@@ -67,7 +67,7 @@
     "publish": {
       "provider": "github",
       "owner": "DEIN_GITHUB_USERNAME",
-      "repo": "luna"
+      "repo": "loona"
     }
   }
 }

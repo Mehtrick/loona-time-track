@@ -11,11 +11,11 @@ build/icon.png
 build/icon.ico
 
 # Data files (user data, not part of source)
-luna-data.json
-luna-settings.json
+loona-data.json
+loona-settings.json
 
 # Test artifacts
-luna-test-data.json
+loona-test-data.json
 
 # Logs
 *.log

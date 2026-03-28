@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "luna-app",
+      "name": "loona-app",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["start"],
       "port": 3001

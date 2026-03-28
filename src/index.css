@@ -31,16 +31,16 @@ body {
 }
 
 /* Smooth transitions */
-.transition-luna {
+.transition-loona {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Glow effect */
-.luna-glow {
+.loona-glow {
   box-shadow: 0 0 20px rgba(107, 26, 230, 0.15);
 }
 
-.luna-glow-hover:hover {
+.loona-glow-hover:hover {
   box-shadow: 0 0 30px rgba(107, 26, 230, 0.25);
 }
 

@@ -87,7 +87,7 @@ export default function Clients() {
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-luna-600 hover:bg-luna-500 text-white rounded-xl text-sm font-medium transition-luna luna-glow-hover"
+            className="flex items-center gap-2 px-4 py-2.5 bg-loona-600 hover:bg-loona-500 text-white rounded-xl text-sm font-medium transition-loona loona-glow-hover"
           >
             <Plus size={16} />
             Neuer Kunde
@@ -108,7 +108,7 @@ export default function Clients() {
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Kundenname..."
-              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna"
+              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
               required
               autoFocus
             />
@@ -121,7 +121,7 @@ export default function Clients() {
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
-                  className={`w-8 h-8 rounded-lg transition-luna ${
+                  className={`w-8 h-8 rounded-lg transition-loona ${
                     color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-night-900' : 'hover:scale-110'
                   }`}
                   style={{ backgroundColor: c }}
@@ -132,7 +132,7 @@ export default function Clients() {
           <div className="flex gap-2">
             <button
               type="submit"
-              className="flex items-center gap-2 px-4 py-2.5 bg-luna-600 hover:bg-luna-500 text-white rounded-xl text-sm font-medium transition-luna"
+              className="flex items-center gap-2 px-4 py-2.5 bg-loona-600 hover:bg-loona-500 text-white rounded-xl text-sm font-medium transition-loona"
             >
               <Check size={16} />
               {editId ? 'Speichern' : 'Anlegen'}
@@ -140,7 +140,7 @@ export default function Clients() {
             <button
               type="button"
               onClick={resetForm}
-              className="flex items-center gap-2 px-4 py-2.5 bg-night-800 hover:bg-night-700 text-night-300 rounded-xl text-sm font-medium transition-luna"
+              className="flex items-center gap-2 px-4 py-2.5 bg-night-800 hover:bg-night-700 text-night-300 rounded-xl text-sm font-medium transition-loona"
             >
               <X size={16} />
               Abbrechen
@@ -156,7 +156,7 @@ export default function Clients() {
           <p className="text-night-400 mb-4">Noch keine Kunden angelegt</p>
           <button
             onClick={() => setShowForm(true)}
-            className="px-4 py-2.5 bg-luna-600 hover:bg-luna-500 text-white rounded-xl text-sm font-medium transition-luna"
+            className="px-4 py-2.5 bg-loona-600 hover:bg-loona-500 text-white rounded-xl text-sm font-medium transition-loona"
           >
             Ersten Kunden anlegen
           </button>
@@ -166,7 +166,7 @@ export default function Clients() {
           {clients.map(client => (
             <div key={client.id} className="bg-night-900 rounded-xl border border-night-700/50 overflow-hidden">
               {/* Client row */}
-              <div className="px-6 py-4 flex items-center justify-between group hover:bg-night-850 transition-luna">
+              <div className="px-6 py-4 flex items-center justify-between group hover:bg-night-850 transition-loona">
                 <div className="flex items-center gap-4">
                   <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: client.color }} />
                   <span className="text-white font-medium">{client.name}</span>
@@ -176,12 +176,12 @@ export default function Clients() {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-luna">
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-loona">
                   {client.planio_url && (
                     <button
                       onClick={() => setImportClient(client)}
                       title="Planio importieren"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-night-400 hover:text-emerald-300 hover:bg-night-800 transition-luna text-xs"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-night-400 hover:text-emerald-300 hover:bg-night-800 transition-loona text-xs"
                     >
                       <Download size={13} />
                       Importieren
@@ -192,23 +192,23 @@ export default function Clients() {
                       planioEditId === client.id ? setPlanioEditId(null) : openPlanioConfig(client)
                     }
                     title="Planio konfigurieren"
-                    className={`p-2 rounded-lg transition-luna ${
+                    className={`p-2 rounded-lg transition-loona ${
                       planioEditId === client.id
-                        ? 'text-luna-400 bg-night-800'
-                        : 'text-night-400 hover:text-luna-300 hover:bg-night-800'
+                        ? 'text-loona-400 bg-night-800'
+                        : 'text-night-400 hover:text-loona-300 hover:bg-night-800'
                     }`}
                   >
                     {planioEditId === client.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                   <button
                     onClick={() => startEdit(client)}
-                    className="p-2 rounded-lg text-night-400 hover:text-white hover:bg-night-800 transition-luna"
+                    className="p-2 rounded-lg text-night-400 hover:text-white hover:bg-night-800 transition-loona"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => handleDelete(client.id)}
-                    className="p-2 rounded-lg text-night-400 hover:text-red-400 hover:bg-night-800 transition-luna"
+                    className="p-2 rounded-lg text-night-400 hover:text-red-400 hover:bg-night-800 transition-loona"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -227,7 +227,7 @@ export default function Clients() {
                   <div className="px-6 py-5 space-y-4">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded bg-night-700 flex items-center justify-center flex-shrink-0">
-                      <Link size={12} className="text-luna-400" />
+                      <Link size={12} className="text-loona-400" />
                     </div>
                     <span className="text-sm font-semibold text-white">Planio</span>
                     {client.planio_url && (
@@ -255,7 +255,7 @@ export default function Clients() {
                         value={planioUrl}
                         onChange={e => setPlanioUrl(e.target.value)}
                         placeholder="https://deinname.planio.com"
-                        className="w-full bg-night-700 border border-night-600/50 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna font-mono"
+                        className="w-full bg-night-700 border border-night-600/50 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona font-mono"
                       />
                     </div>
                     <div>
@@ -267,7 +267,7 @@ export default function Clients() {
                         value={planioKey}
                         onChange={e => setPlanioKey(e.target.value)}
                         placeholder="••••••••••••••••••••••••••••••••••••••••"
-                        className="w-full bg-night-700 border border-night-600/50 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna font-mono"
+                        className="w-full bg-night-700 border border-night-600/50 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona font-mono"
                       />
                     </div>
                   </div>
@@ -275,14 +275,14 @@ export default function Clients() {
                     <button
                       onClick={() => savePlanioConfig(client.id)}
                       disabled={planioSaving}
-                      className="flex items-center gap-2 px-4 py-2 bg-luna-600 hover:bg-luna-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-luna"
+                      className="flex items-center gap-2 px-4 py-2 bg-loona-600 hover:bg-loona-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-loona"
                     >
                       <Check size={14} />
                       {planioSaving ? 'Speichern…' : 'Speichern'}
                     </button>
                     <button
                       onClick={() => setPlanioEditId(null)}
-                      className="flex items-center gap-2 px-4 py-2 bg-night-700 hover:bg-night-600 text-night-300 rounded-lg text-sm font-medium transition-luna"
+                      className="flex items-center gap-2 px-4 py-2 bg-night-700 hover:bg-night-600 text-night-300 rounded-lg text-sm font-medium transition-loona"
                     >
                       <X size={14} />
                       Abbrechen

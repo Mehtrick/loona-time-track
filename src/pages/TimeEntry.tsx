@@ -93,7 +93,7 @@ export default function TimeEntry() {
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna"
+              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
               required
             />
           </div>
@@ -104,7 +104,7 @@ export default function TimeEntry() {
             {clients.length === 0 ? (
               <p className="text-night-400 text-sm">
                 Noch keine Kunden angelegt.{' '}
-                <a href="/kunden" className="text-luna-300 hover:underline">Kunden verwalten</a>
+                <a href="/kunden" className="text-loona-300 hover:underline">Kunden verwalten</a>
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -116,9 +116,9 @@ export default function TimeEntry() {
                       setSelectedClient(selectedClient === client.id ? '' : client.id)
                       setTicketText('')
                     }}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-luna border ${
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-loona border ${
                       selectedClient === client.id
-                        ? 'border-luna-500 bg-luna-600/20 text-white'
+                        ? 'border-loona-500 bg-loona-600/20 text-white'
                         : 'border-night-600/50 bg-night-800 text-night-300 hover:text-white hover:bg-night-700'
                     }`}
                   >
@@ -152,7 +152,7 @@ export default function TimeEntry() {
                   }}
                   onFocus={() => setShowSuggestions(true)}
                   placeholder="Ticket-Referenz eingeben oder auswählen..."
-                  className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna"
+                  className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
                   autoComplete="off"
                 />
                 {showSuggestions && filteredTickets.length > 0 && (
@@ -165,9 +165,9 @@ export default function TimeEntry() {
                         key={ticket.id}
                         type="button"
                         onClick={() => selectTicket(ticket)}
-                        className="w-full text-left px-4 py-2.5 hover:bg-night-700 transition-luna flex items-center gap-3 first:rounded-t-xl last:rounded-b-xl"
+                        className="w-full text-left px-4 py-2.5 hover:bg-night-700 transition-loona flex items-center gap-3 first:rounded-t-xl last:rounded-b-xl"
                       >
-                        <span className="px-2 py-0.5 bg-night-900 rounded text-xs font-mono text-luna-200">
+                        <span className="px-2 py-0.5 bg-night-900 rounded text-xs font-mono text-loona-200">
                           {ticket.reference}
                         </span>
                         <span className="text-sm text-night-200 truncate">{ticket.name}</span>
@@ -179,7 +179,7 @@ export default function TimeEntry() {
                   <div className="absolute z-10 left-0 right-0 mt-1 bg-night-800 border border-night-600/50 rounded-xl shadow-xl px-4 py-3">
                     <p className="text-sm text-night-300">
                       <Plus size={12} className="inline mr-1" />
-                      <span className="text-luna-300">"{ticketText}"</span> wird beim Speichern als neues Ticket angelegt
+                      <span className="text-loona-300">"{ticketText}"</span> wird beim Speichern als neues Ticket angelegt
                     </p>
                   </div>
                 )}
@@ -196,9 +196,9 @@ export default function TimeEntry() {
                   key={h}
                   type="button"
                   onClick={() => setHours(String(h))}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-luna border ${
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-loona border ${
                     hours === String(h)
-                      ? 'border-luna-500 bg-luna-600/20 text-luna-200'
+                      ? 'border-loona-500 bg-loona-600/20 text-loona-200'
                       : 'border-night-600/50 bg-night-800 text-night-400 hover:text-white'
                   }`}
                 >
@@ -214,7 +214,7 @@ export default function TimeEntry() {
               value={hours}
               onChange={e => setHours(e.target.value)}
               placeholder="Stunden eingeben..."
-              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna"
+              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
               required
             />
           </div>
@@ -227,7 +227,7 @@ export default function TimeEntry() {
               onChange={e => setDescription(e.target.value)}
               rows={3}
               placeholder="Was hast du gemacht?"
-              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-luna-500 focus:ring-1 focus:ring-luna-500 transition-luna resize-none"
+              className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona resize-none"
             />
           </div>
         </div>
@@ -236,10 +236,10 @@ export default function TimeEntry() {
         <button
           type="submit"
           disabled={!selectedClient || !hours || saving}
-          className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-medium text-white transition-luna ${
+          className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-medium text-white transition-loona ${
             saved
               ? 'bg-emerald-600'
-              : 'bg-luna-600 hover:bg-luna-500 luna-glow-hover disabled:opacity-40 disabled:cursor-not-allowed'
+              : 'bg-loona-600 hover:bg-loona-500 loona-glow-hover disabled:opacity-40 disabled:cursor-not-allowed'
           }`}
         >
           {saved ? (

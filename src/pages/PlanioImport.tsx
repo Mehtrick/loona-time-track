@@ -76,7 +76,7 @@ export default function PlanioImport({ client, onClose, onImported }: Props) {
               <p className="text-night-400 text-xs">{client.name}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg text-night-400 hover:text-white hover:bg-night-800 transition-luna">
+          <button onClick={onClose} className="p-2 rounded-lg text-night-400 hover:text-white hover:bg-night-800 transition-loona">
             <X size={16} />
           </button>
         </div>
@@ -93,7 +93,7 @@ export default function PlanioImport({ client, onClose, onImported }: Props) {
               </p>
               <button
                 onClick={loadPreview}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-luna-600 hover:bg-luna-500 text-white rounded-xl text-sm font-medium transition-luna luna-glow-hover"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-loona-600 hover:bg-loona-500 text-white rounded-xl text-sm font-medium transition-loona loona-glow-hover"
               >
                 <RefreshCw size={15} />
                 Verbinden &amp; Vorschau laden
@@ -104,7 +104,7 @@ export default function PlanioImport({ client, onClose, onImported }: Props) {
           {/* Step: loading */}
           {step === 'loading-preview' && (
             <div className="flex flex-col items-center gap-4 py-4">
-              <Loader size={28} className="text-luna-400 animate-spin" />
+              <Loader size={28} className="text-loona-400 animate-spin" />
               <p className="text-night-300 text-sm">Verbinde mit Planio…</p>
             </div>
           )}
@@ -127,24 +127,24 @@ export default function PlanioImport({ client, onClose, onImported }: Props) {
 
               <div className="space-y-2">
                 <p className="text-night-300 text-xs font-medium uppercase tracking-wide">Was importieren?</p>
-                <label className="flex items-center gap-3 p-3 bg-night-800 rounded-xl cursor-pointer hover:bg-night-750 transition-luna">
+                <label className="flex items-center gap-3 p-3 bg-night-800 rounded-xl cursor-pointer hover:bg-night-750 transition-loona">
                   <input
                     type="checkbox"
                     checked={importTickets}
                     onChange={e => setImportTickets(e.target.checked)}
-                    className="w-4 h-4 accent-luna-500 cursor-pointer"
+                    className="w-4 h-4 accent-loona-500 cursor-pointer"
                   />
                   <div>
                     <p className="text-white text-sm">Tickets importieren</p>
                     <p className="text-night-400 text-xs">{stats.new_issues} neue Issues aus Planio</p>
                   </div>
                 </label>
-                <label className="flex items-center gap-3 p-3 bg-night-800 rounded-xl cursor-pointer hover:bg-night-750 transition-luna">
+                <label className="flex items-center gap-3 p-3 bg-night-800 rounded-xl cursor-pointer hover:bg-night-750 transition-loona">
                   <input
                     type="checkbox"
                     checked={importEntries}
                     onChange={e => setImportEntries(e.target.checked)}
-                    className="w-4 h-4 accent-luna-500 cursor-pointer"
+                    className="w-4 h-4 accent-loona-500 cursor-pointer"
                   />
                   <div>
                     <p className="text-white text-sm">Buchungen importieren</p>
@@ -156,7 +156,7 @@ export default function PlanioImport({ client, onClose, onImported }: Props) {
               <button
                 onClick={runImport}
                 disabled={!importTickets && !importEntries}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-luna-600 hover:bg-luna-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-luna luna-glow-hover"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-loona-600 hover:bg-loona-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-loona loona-glow-hover"
               >
                 <Download size={15} />
                 Import starten
@@ -167,7 +167,7 @@ export default function PlanioImport({ client, onClose, onImported }: Props) {
           {/* Step: importing */}
           {step === 'importing' && (
             <div className="flex flex-col items-center gap-4 py-4">
-              <Loader size={28} className="text-luna-400 animate-spin" />
+              <Loader size={28} className="text-loona-400 animate-spin" />
               <p className="text-night-300 text-sm">Importiere Daten…</p>
             </div>
           )}
@@ -185,7 +185,7 @@ export default function PlanioImport({ client, onClose, onImported }: Props) {
               </div>
               <button
                 onClick={onClose}
-                className="px-6 py-2.5 bg-night-800 hover:bg-night-700 text-white rounded-xl text-sm font-medium transition-luna"
+                className="px-6 py-2.5 bg-night-800 hover:bg-night-700 text-white rounded-xl text-sm font-medium transition-loona"
               >
                 Schließen
               </button>
@@ -202,7 +202,7 @@ export default function PlanioImport({ client, onClose, onImported }: Props) {
               </div>
               <button
                 onClick={() => setStep('preview')}
-                className="px-6 py-2.5 bg-night-800 hover:bg-night-700 text-white rounded-xl text-sm font-medium transition-luna"
+                className="px-6 py-2.5 bg-night-800 hover:bg-night-700 text-white rounded-xl text-sm font-medium transition-loona"
               >
                 Erneut versuchen
               </button>

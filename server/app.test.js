@@ -8,7 +8,7 @@ import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const TEST_DATA_FILE = join(__dirname, '..', 'luna-test-data.json');
+const TEST_DATA_FILE = join(__dirname, '..', 'loona-test-data.json');
 
 let app;
 

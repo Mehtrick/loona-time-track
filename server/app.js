@@ -348,7 +348,7 @@ export function createApp(dataFilePath) {
     return json.user?.id ?? null;
   }
 
-  // Maps a Planio time entry to Luna entry fields.
+  // Maps a Planio time entry to Loona entry fields.
   // If comments contain "Abgerechnet" → billed field; otherwise → description field.
   function mapEntryFields(te) {
     const comment = te.comments || '';

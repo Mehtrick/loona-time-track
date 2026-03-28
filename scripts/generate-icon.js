@@ -1,4 +1,4 @@
-// Generates luna icon as PNG and ICO for Electron
+// Generates loona icon as PNG and ICO for Electron
 import { createWriteStream, mkdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -124,7 +124,7 @@ function encodeICO(pngData, width, height) {
 }
 
 // Generate
-console.log('Generating Luna icon...');
+console.log('Generating Loona icon...');
 const rgba = drawMoon(SIZE);
 const png = encodePNG(rgba, SIZE, SIZE);
 const ico = encodeICO(png, SIZE, SIZE);

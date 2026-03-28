@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        luna: {
+        loona: {
           50: '#f0e6ff',
           100: '#d4b8ff',
           200: '#b78aff',

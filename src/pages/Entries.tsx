@@ -121,7 +121,7 @@ export default function Entries() {
           <select
             value={filterClient}
             onChange={e => setFilterClient(e.target.value ? Number(e.target.value) : '')}
-            className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-luna-500"
+            className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-loona-500"
           >
             <option value="">Alle Kunden</option>
             {clients.map(c => (
@@ -134,21 +134,21 @@ export default function Entries() {
             value={filterFrom}
             onChange={e => setFilterFrom(e.target.value)}
             placeholder="Von"
-            className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-luna-500"
+            className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-loona-500"
           />
           <input
             type="date"
             value={filterTo}
             onChange={e => setFilterTo(e.target.value)}
             placeholder="Bis"
-            className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-luna-500"
+            className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-loona-500"
           />
 
           <button
             onClick={() => setShowBilled(!showBilled)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-luna border ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-loona border ${
               showBilled
-                ? 'border-luna-500 bg-luna-600/20 text-luna-200'
+                ? 'border-loona-500 bg-loona-600/20 text-loona-200'
                 : 'border-night-600/50 bg-night-800 text-night-400 hover:text-white'
             }`}
           >
@@ -159,7 +159,7 @@ export default function Entries() {
           {(filterClient || filterFrom || filterTo) && (
             <button
               onClick={() => { setFilterClient(''); setFilterFrom(''); setFilterTo('') }}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-night-400 hover:text-white border border-night-600/50 bg-night-800 transition-luna"
+              className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-night-400 hover:text-white border border-night-600/50 bg-night-800 transition-loona"
             >
               <X size={14} /> Zurücksetzen
             </button>
@@ -169,9 +169,9 @@ export default function Entries() {
 
       {/* Batch billing bar */}
       {selectedIds.size > 0 && (
-        <div className="bg-luna-600/10 border border-luna-500/30 rounded-2xl p-4 flex items-center justify-between">
+        <div className="bg-loona-600/10 border border-loona-500/30 rounded-2xl p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-luna-200 text-sm font-medium">
+            <span className="text-loona-200 text-sm font-medium">
               {selectedIds.size} Buchung{selectedIds.size !== 1 ? 'en' : ''} ausgewählt
             </span>
             <span className="text-night-400 text-sm">({selectedHours.toFixed(1)}h)</span>
@@ -184,20 +184,20 @@ export default function Entries() {
                 onChange={e => setBatchBillingText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleBatchBill()}
                 placeholder="z.B. Rechnung #2024-03"
-                className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white w-64 focus:outline-none focus:border-luna-500"
+                className="bg-night-800 border border-night-600/50 rounded-lg px-3 py-2 text-sm text-white w-64 focus:outline-none focus:border-loona-500"
                 autoFocus
               />
               <button
                 onClick={handleBatchBill}
                 disabled={!batchBillingText.trim()}
-                className="flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-luna"
+                className="flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-loona"
               >
                 <Receipt size={14} />
                 Alle abrechnen
               </button>
               <button
                 onClick={() => { setShowBatchBilling(false); setBatchBillingText('') }}
-                className="p-2 rounded-lg text-night-400 hover:text-white transition-luna"
+                className="p-2 rounded-lg text-night-400 hover:text-white transition-loona"
               >
                 <X size={16} />
               </button>
@@ -206,14 +206,14 @@ export default function Entries() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowBatchBilling(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-luna-600 hover:bg-luna-500 text-white rounded-lg text-sm font-medium transition-luna"
+                className="flex items-center gap-2 px-4 py-2 bg-loona-600 hover:bg-loona-500 text-white rounded-lg text-sm font-medium transition-loona"
               >
                 <Receipt size={14} />
                 Auswahl abrechnen
               </button>
               <button
                 onClick={() => setSelectedIds(new Set())}
-                className="px-3 py-2 text-night-400 hover:text-white text-sm transition-luna"
+                className="px-3 py-2 text-night-400 hover:text-white text-sm transition-loona"
               >
                 Auswahl aufheben
               </button>
@@ -238,7 +238,7 @@ export default function Entries() {
                 <tr className="text-left text-xs text-night-400 uppercase tracking-wider border-b border-night-800">
                   <th className="px-4 py-4 w-10">
                     {unbilledEntries.length > 0 && (
-                      <button onClick={toggleSelectAll} className="text-night-400 hover:text-luna-300 transition-luna">
+                      <button onClick={toggleSelectAll} className="text-night-400 hover:text-loona-300 transition-loona">
                         {selectedIds.size === unbilledEntries.length && unbilledEntries.length > 0
                           ? <CheckSquare size={16} />
                           : <Square size={16} />
@@ -258,17 +258,17 @@ export default function Entries() {
                 {entries.map(entry => (
                   <tr
                     key={entry.id}
-                    className={`hover:bg-night-800/30 transition-luna group ${
-                      selectedIds.has(entry.id) ? 'bg-luna-600/5' : ''
+                    className={`hover:bg-night-800/30 transition-loona group ${
+                      selectedIds.has(entry.id) ? 'bg-loona-600/5' : ''
                     }`}
                   >
                     <td className="px-4 py-4">
                       {!entry.billed && (
                         <button
                           onClick={() => toggleSelect(entry.id)}
-                          className={`transition-luna ${
+                          className={`transition-loona ${
                             selectedIds.has(entry.id)
-                              ? 'text-luna-300'
+                              ? 'text-loona-300'
                               : 'text-night-600 hover:text-night-400'
                           }`}
                         >
@@ -305,7 +305,7 @@ export default function Entries() {
                         {entry.billed ? (
                           <button
                             onClick={() => handleUnbill(entry)}
-                            className="px-2 py-1 rounded text-xs bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 transition-luna"
+                            className="px-2 py-1 rounded text-xs bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 transition-loona"
                             title={`Abgerechnet: ${entry.billed}`}
                           >
                             ✓ {entry.billed.length > 20 ? entry.billed.slice(0, 20) + '...' : entry.billed}
@@ -318,18 +318,18 @@ export default function Entries() {
                               onChange={e => setBillingText(e.target.value)}
                               onKeyDown={e => e.key === 'Enter' && handleBill(entry.id)}
                               placeholder="z.B. Rechnung #2024-03"
-                              className="bg-night-800 border border-night-600/50 rounded px-2 py-1 text-xs text-white w-48 focus:outline-none focus:border-luna-500"
+                              className="bg-night-800 border border-night-600/50 rounded px-2 py-1 text-xs text-white w-48 focus:outline-none focus:border-loona-500"
                               autoFocus
                             />
                             <button
                               onClick={() => handleBill(entry.id)}
-                              className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 transition-luna"
+                              className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 transition-loona"
                             >
                               <Receipt size={12} />
                             </button>
                             <button
                               onClick={() => { setBillingEntry(null); setBillingText('') }}
-                              className="p-1 rounded bg-night-700 text-night-300 hover:text-white transition-luna"
+                              className="p-1 rounded bg-night-700 text-night-300 hover:text-white transition-loona"
                             >
                               <X size={12} />
                             </button>
@@ -338,14 +338,14 @@ export default function Entries() {
                           <>
                             <button
                               onClick={() => { setBillingEntry(entry.id); setBillingText('') }}
-                              className="px-2 py-1 rounded text-xs bg-luna-600/20 text-luna-300 hover:bg-luna-600/30 transition-luna opacity-0 group-hover:opacity-100"
+                              className="px-2 py-1 rounded text-xs bg-loona-600/20 text-loona-300 hover:bg-loona-600/30 transition-loona opacity-0 group-hover:opacity-100"
                             >
                               <Receipt size={12} className="inline mr-1" />
                               Abrechnen
                             </button>
                             <button
                               onClick={() => handleDelete(entry.id)}
-                              className="p-1 rounded text-night-500 hover:text-red-400 transition-luna opacity-0 group-hover:opacity-100"
+                              className="p-1 rounded text-night-500 hover:text-red-400 transition-loona opacity-0 group-hover:opacity-100"
                             >
                               <Trash2 size={14} />
                             </button>
