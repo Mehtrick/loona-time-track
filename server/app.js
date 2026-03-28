@@ -126,6 +126,17 @@ export function createApp(dataFilePath) {
     res.json({ ok: true });
   });
 
+  app.put('/api/clients/:id/planio', (req, res) => {
+    const data = loadData();
+    const id = Number(req.params.id);
+    const client = data.clients.find(c => c.id === id);
+    if (!client) return res.status(404).json({ error: 'Not found' });
+    client.planio_url = req.body.planio_url ?? client.planio_url ?? '';
+    client.planio_api_key = req.body.planio_api_key ?? client.planio_api_key ?? '';
+    saveData(data);
+    res.json(client);
+  });
+
   // === TICKETS ===
   app.get('/api/tickets', (req, res) => {
     const data = loadData();
@@ -307,6 +318,169 @@ export function createApp(dataFilePath) {
     data.entries = data.entries.filter(e => e.id !== Number(req.params.id));
     saveData(data);
     res.json({ ok: true });
+  });
+
+  // === PLANIO INTEGRATION ===
+
+  async function planioFetchAll(baseUrl, apiKey, resource, extraParams = '') {
+    const items = [];
+    let offset = 0;
+    const limit = 100;
+    while (true) {
+      const url = `${baseUrl.replace(/\/$/, '')}/${resource}.json?limit=${limit}&offset=${offset}${extraParams}`;
+      const res = await fetch(url, { headers: { 'X-Redmine-API-Key': apiKey } });
+      if (!res.ok) throw new Error(`Planio API ${res.status}: ${res.statusText}`);
+      const json = await res.json();
+      const records = json[resource];
+      if (!records || records.length === 0) break;
+      items.push(...records);
+      if (items.length >= (json.total_count ?? items.length)) break;
+      offset += limit;
+    }
+    return items;
+  }
+
+  // GET /api/planio/preview?client_id=X
+  app.get('/api/planio/preview', async (req, res) => {
+    const data = loadData();
+    const clientId = Number(req.query.client_id);
+    const client = data.clients.find(c => c.id === clientId);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.planio_url || !client.planio_api_key) {
+      return res.status(400).json({ error: 'Planio nicht konfiguriert' });
+    }
+
+    try {
+      const [issues, timeEntries] = await Promise.all([
+        planioFetchAll(client.planio_url, client.planio_api_key, 'issues', '&status_id=*'),
+        planioFetchAll(client.planio_url, client.planio_api_key, 'time_entries'),
+      ]);
+
+      const existingTicketIds = new Set(
+        data.tickets.filter(t => t.planio_id).map(t => t.planio_id)
+      );
+      const existingEntryIds = new Set(
+        data.entries.filter(e => e.planio_id).map(e => e.planio_id)
+      );
+
+      res.json({
+        stats: {
+          total_issues: issues.length,
+          new_issues: issues.filter(i => !existingTicketIds.has(i.id)).length,
+          total_entries: timeEntries.length,
+          new_entries: timeEntries.filter(e => !existingEntryIds.has(e.id)).length,
+        },
+      });
+    } catch (err) {
+      res.status(502).json({ error: `Planio nicht erreichbar: ${err.message}` });
+    }
+  });
+
+  // POST /api/planio/import
+  // Body: { client_id, import_tickets: bool, import_entries: bool }
+  app.post('/api/planio/import', async (req, res) => {
+    const data = loadData();
+    const { client_id, import_tickets, import_entries } = req.body;
+    const clientId = Number(client_id);
+    const client = data.clients.find(c => c.id === clientId);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.planio_url || !client.planio_api_key) {
+      return res.status(400).json({ error: 'Planio nicht konfiguriert' });
+    }
+
+    try {
+      // Always fetch issues when importing entries (needed to resolve ticket references)
+      const fetchIssues = import_tickets || import_entries;
+      const [issues, timeEntries] = await Promise.all([
+        fetchIssues
+          ? planioFetchAll(client.planio_url, client.planio_api_key, 'issues', '&status_id=*')
+          : Promise.resolve([]),
+        import_entries
+          ? planioFetchAll(client.planio_url, client.planio_api_key, 'time_entries')
+          : Promise.resolve([]),
+      ]);
+
+      const existingTicketPlanioIds = new Set(
+        data.tickets.filter(t => t.planio_id).map(t => t.planio_id)
+      );
+      const existingEntryPlanioIds = new Set(
+        data.entries.filter(e => e.planio_id).map(e => e.planio_id)
+      );
+
+      let ticketsImported = 0;
+      let entriesImported = 0;
+
+      if (import_tickets) {
+        for (const issue of issues) {
+          if (existingTicketPlanioIds.has(issue.id)) continue;
+          const ticket = {
+            id: data.nextId.tickets++,
+            client_id: clientId,
+            planio_id: issue.id,
+            reference: `#${issue.id}`,
+            name: issue.subject,
+            description: issue.description || '',
+            active: issue.status?.is_closed ? 0 : 1,
+            created_at: issue.created_on || now(),
+          };
+          data.tickets.push(ticket);
+          existingTicketPlanioIds.add(issue.id);
+          ticketsImported++;
+        }
+      }
+
+      if (import_entries) {
+        for (const te of timeEntries) {
+          if (existingEntryPlanioIds.has(te.id)) continue;
+
+          // Find or auto-create ticket for this time entry
+          let ticketId = null;
+          if (te.issue?.id) {
+            let ticket = data.tickets.find(
+              t => t.planio_id === te.issue.id && t.client_id === clientId
+            );
+            if (!ticket) {
+              // Auto-create ticket from issue data (or a stub if issue wasn't fetched)
+              const issue = issues.find(i => i.id === te.issue.id);
+              ticket = {
+                id: data.nextId.tickets++,
+                client_id: clientId,
+                planio_id: te.issue.id,
+                reference: `#${te.issue.id}`,
+                name: issue?.subject || `Planio #${te.issue.id}`,
+                description: issue?.description || '',
+                active: issue?.status?.is_closed ? 0 : 1,
+                created_at: issue?.created_on || now(),
+              };
+              data.tickets.push(ticket);
+              existingTicketPlanioIds.add(te.issue.id);
+              ticketsImported++;
+            }
+            ticketId = ticket.id;
+          }
+
+          const entry = {
+            id: data.nextId.entries++,
+            client_id: clientId,
+            planio_id: te.id,
+            ticket_id: ticketId,
+            date: te.spent_on,
+            hours: te.hours,
+            // Planio comments = work description; billed stays empty (user bills via Luna)
+            description: te.comments || te.activity?.name || '',
+            billed: '',
+            created_at: te.created_on || now(),
+          };
+          data.entries.push(entry);
+          entriesImported++;
+        }
+      }
+
+      saveData(data);
+      res.json({ ok: true, tickets_imported: ticketsImported, entries_imported: entriesImported });
+    } catch (err) {
+      res.status(502).json({ error: `Planio nicht erreichbar: ${err.message}` });
+    }
   });
 
   return app;

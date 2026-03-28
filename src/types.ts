@@ -2,7 +2,22 @@ export interface Client {
   id: number
   name: string
   color: string
+  planio_url?: string
+  planio_api_key?: string
   created_at: string
+}
+
+export interface PlanioStats {
+  total_issues: number
+  new_issues: number
+  total_entries: number
+  new_entries: number
+}
+
+export interface PlanioImportResult {
+  ok: boolean
+  tickets_imported: number
+  entries_imported: number
 }
 
 export interface Ticket {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, vi, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
 import { writeFileSync, unlinkSync, existsSync } from 'fs';
@@ -459,5 +459,157 @@ describe('Edge cases', () => {
 
     const summary = await request(app).get('/api/entries/summary');
     expect(summary.body[0].total_hours).toBe(1);
+  });
+});
+
+// =====================
+// PLANIO INTEGRATION
+// =====================
+
+const PLANIO_ISSUES = [
+  { id: 101, subject: 'Bug Fix', description: 'Fix the thing', status: { id: 1, name: 'New', is_closed: false }, created_on: '2025-01-01T00:00:00Z' },
+  { id: 102, subject: 'Feature', description: '', status: { id: 5, name: 'Closed', is_closed: true }, created_on: '2025-01-02T00:00:00Z' },
+];
+const PLANIO_ENTRIES = [
+  { id: 201, issue: { id: 101 }, hours: 2.5, comments: 'Bugfix impl', activity: { name: 'Development' }, spent_on: '2025-06-01', created_on: '2025-06-01T10:00:00Z' },
+  { id: 202, issue: { id: 101 }, hours: 1.0, comments: '', activity: { name: 'Testing' }, spent_on: '2025-06-02', created_on: '2025-06-02T10:00:00Z' },
+];
+
+function mockFetch(issues = PLANIO_ISSUES, entries = PLANIO_ENTRIES) {
+  vi.stubGlobal('fetch', async (url) => {
+    if (url.includes('/issues.json')) {
+      return { ok: true, json: async () => ({ issues, total_count: issues.length }) };
+    }
+    if (url.includes('/time_entries.json')) {
+      return { ok: true, json: async () => ({ time_entries: entries, total_count: entries.length }) };
+    }
+    return { ok: false, status: 404, statusText: 'Not Found' };
+  });
+}
+
+describe('Planio API', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('PUT /api/clients/:id/planio saves planio config', async () => {
+    await request(app).post('/api/clients').send({ name: 'Client A' });
+    const res = await request(app).put('/api/clients/1/planio').send({
+      planio_url: 'https://test.planio.com',
+      planio_api_key: 'abc123',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.planio_url).toBe('https://test.planio.com');
+    expect(res.body.planio_api_key).toBe('abc123');
+  });
+
+  it('PUT /api/clients/:id/planio returns 404 for unknown client', async () => {
+    const res = await request(app).put('/api/clients/999/planio').send({ planio_url: 'x', planio_api_key: 'y' });
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /api/planio/preview returns 404 for unknown client', async () => {
+    const res = await request(app).get('/api/planio/preview?client_id=999');
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /api/planio/preview returns 400 when planio not configured', async () => {
+    await request(app).post('/api/clients').send({ name: 'Client A' });
+    const res = await request(app).get('/api/planio/preview?client_id=1');
+    expect(res.status).toBe(400);
+  });
+
+  it('GET /api/planio/preview returns stats from Planio', async () => {
+    mockFetch();
+    await request(app).post('/api/clients').send({ name: 'Client A' });
+    await request(app).put('/api/clients/1/planio').send({ planio_url: 'https://t.planio.com', planio_api_key: 'k' });
+
+    const res = await request(app).get('/api/planio/preview?client_id=1');
+    expect(res.status).toBe(200);
+    expect(res.body.stats.total_issues).toBe(2);
+    expect(res.body.stats.new_issues).toBe(2);
+    expect(res.body.stats.total_entries).toBe(2);
+    expect(res.body.stats.new_entries).toBe(2);
+  });
+
+  it('GET /api/planio/preview reports existing items as not-new', async () => {
+    mockFetch();
+    await request(app).post('/api/clients').send({ name: 'Client A' });
+    await request(app).put('/api/clients/1/planio').send({ planio_url: 'https://t.planio.com', planio_api_key: 'k' });
+    // Pre-seed an already-imported ticket
+    resetData({
+      version: 2,
+      clients: [{ id: 1, name: 'Client A', color: '#fff', planio_url: 'https://t.planio.com', planio_api_key: 'k', created_at: '' }],
+      tickets: [{ id: 1, client_id: 1, planio_id: 101, reference: '#101', name: 'Bug Fix', description: '', active: 1, created_at: '' }],
+      entries: [],
+      nextId: { clients: 2, tickets: 2, entries: 1 },
+    });
+    app = createApp(TEST_DATA_FILE);
+
+    const res = await request(app).get('/api/planio/preview?client_id=1');
+    expect(res.body.stats.new_issues).toBe(1); // only issue 102 is new
+    expect(res.body.stats.new_entries).toBe(2);
+  });
+
+  it('GET /api/planio/preview returns 502 when fetch fails', async () => {
+    vi.stubGlobal('fetch', async () => { throw new Error('ECONNREFUSED'); });
+    await request(app).post('/api/clients').send({ name: 'Client A' });
+    await request(app).put('/api/clients/1/planio').send({ planio_url: 'https://t.planio.com', planio_api_key: 'k' });
+
+    const res = await request(app).get('/api/planio/preview?client_id=1');
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/Planio/);
+  });
+
+  it('POST /api/planio/import imports tickets only', async () => {
+    mockFetch();
+    await request(app).post('/api/clients').send({ name: 'Client A' });
+    await request(app).put('/api/clients/1/planio').send({ planio_url: 'https://t.planio.com', planio_api_key: 'k' });
+
+    const res = await request(app).post('/api/planio/import').send({ client_id: 1, import_tickets: true, import_entries: false });
+    expect(res.status).toBe(200);
+    expect(res.body.tickets_imported).toBe(2);
+    expect(res.body.entries_imported).toBe(0);
+
+    const tickets = await request(app).get('/api/tickets');
+    expect(tickets.body).toHaveLength(2);
+    expect(tickets.body.find(t => t.planio_id === 101).reference).toBe('#101');
+    expect(tickets.body.find(t => t.planio_id === 102).active).toBe(0); // closed issue
+  });
+
+  it('POST /api/planio/import imports entries and auto-creates tickets', async () => {
+    mockFetch();
+    await request(app).post('/api/clients').send({ name: 'Client A' });
+    await request(app).put('/api/clients/1/planio').send({ planio_url: 'https://t.planio.com', planio_api_key: 'k' });
+
+    const res = await request(app).post('/api/planio/import').send({ client_id: 1, import_tickets: false, import_entries: true });
+    expect(res.status).toBe(200);
+    expect(res.body.entries_imported).toBe(2);
+    // Ticket for issue 101 should have been auto-created
+    expect(res.body.tickets_imported).toBe(1);
+
+    const entries = await request(app).get('/api/entries?show_billed=1');
+    expect(entries.body).toHaveLength(2);
+    const e1 = entries.body.find(e => e.planio_id === 201);
+    expect(e1.hours).toBe(2.5);
+    expect(e1.description).toBe('Bugfix impl');
+    expect(e1.billed).toBe('');
+    expect(e1.ticket_id).toBeGreaterThan(0);
+  });
+
+  it('POST /api/planio/import skips already-imported items', async () => {
+    mockFetch();
+    await request(app).post('/api/clients').send({ name: 'Client A' });
+    await request(app).put('/api/clients/1/planio').send({ planio_url: 'https://t.planio.com', planio_api_key: 'k' });
+    // First import
+    await request(app).post('/api/planio/import').send({ client_id: 1, import_tickets: true, import_entries: true });
+    // Second import should import nothing new
+    const res = await request(app).post('/api/planio/import').send({ client_id: 1, import_tickets: true, import_entries: true });
+    expect(res.body.tickets_imported).toBe(0);
+    expect(res.body.entries_imported).toBe(0);
+  });
+
+  it('POST /api/planio/import returns 400 when planio not configured', async () => {
+    await request(app).post('/api/clients').send({ name: 'Client A' });
+    const res = await request(app).post('/api/planio/import').send({ client_id: 1, import_tickets: true, import_entries: false });
+    expect(res.status).toBe(400);
   });
 });

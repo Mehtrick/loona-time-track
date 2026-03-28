@@ -43,6 +43,9 @@ export const api = {
   deleteTicket: (id: number) =>
     request<any>(`/tickets/${id}`, { method: 'DELETE' }),
 
+  updateClientPlanio: (id: number, data: { planio_url: string; planio_api_key: string }) =>
+    request<any>(`/clients/${id}/planio`, { method: 'PUT', body: JSON.stringify(data) }),
+
   // Time Entries
   getEntries: (params?: { client_id?: number; ticket_id?: number; show_billed?: boolean; from?: string; to?: string }) => {
     const query = new URLSearchParams()
@@ -60,4 +63,10 @@ export const api = {
     request<any>(`/entries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteEntry: (id: number) =>
     request<any>(`/entries/${id}`, { method: 'DELETE' }),
+
+  // Planio
+  getPlanioPreview: (clientId: number) =>
+    request<any>(`/planio/preview?client_id=${clientId}`),
+  planioImport: (data: { client_id: number; import_tickets: boolean; import_entries: boolean }) =>
+    request<any>('/planio/import', { method: 'POST', body: JSON.stringify(data) }),
 }
