@@ -215,17 +215,36 @@ export default function Clients() {
                 </div>
               </div>
 
-              {/* Planio config inline panel */}
+              {/* Integrations panel */}
               {planioEditId === client.id && (
-                <div className="px-6 py-5 border-t border-night-700/50 bg-night-800/50 space-y-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Link size={14} className="text-luna-400" />
-                    <span className="text-sm font-medium text-white">Planio Integration</span>
+                <div className="border-t border-night-700/50">
+                  {/* Section header */}
+                  <div className="px-6 py-3 bg-night-800/30 border-b border-night-700/30">
+                    <p className="text-xs font-semibold text-night-400 uppercase tracking-widest">Integrationen</p>
                   </div>
-                  <p className="text-night-400 text-xs">
-                    Hinterlege die Planio-URL und deinen API-Key, um Tickets und Buchungen zu importieren.
-                    Den API-Key findest du in Planio unter <em>Mein Konto → API-Zugangsdaten</em>.
+
+                  {/* Planio */}
+                  <div className="px-6 py-5 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-night-700 flex items-center justify-center flex-shrink-0">
+                      <Link size={12} className="text-luna-400" />
+                    </div>
+                    <span className="text-sm font-semibold text-white">Planio</span>
+                    {client.planio_url && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-medium">Verbunden</span>
+                    )}
+                  </div>
+                  <p className="text-night-400 text-xs leading-relaxed">
+                    Hinterlege die URL deiner Planio-Instanz und deinen persönlichen API-Zugriffsschlüssel,
+                    um Tickets und Buchungen zu importieren.
                   </p>
+                  <div className="bg-night-700/40 border border-night-600/30 rounded-lg px-4 py-3 text-xs text-night-300 leading-relaxed">
+                    <span className="text-night-200 font-medium">API-Key finden:</span>{' '}
+                    Klicke oben rechts auf dein Nutzerprofil →{' '}
+                    <span className="text-white">Mein Konto</span> →
+                    auf der rechten Seite findest du den Abschnitt{' '}
+                    <span className="text-white">API-Zugriffsschlüssel</span>.
+                  </div>
                   <div className="grid grid-cols-1 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-night-300 mb-1.5">
@@ -269,7 +288,8 @@ export default function Clients() {
                       Abbrechen
                     </button>
                   </div>
-                </div>
+                  </div>{/* end Planio section */}
+                </div>{/* end Integrations panel */}
               )}
             </div>
           ))}
