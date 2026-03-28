@@ -288,8 +288,8 @@ export default function Clients() {
                       Abbrechen
                     </button>
                   </div>
-                  </div>{/* end Planio section */}
-                </div>{/* end Integrations panel */}
+                  </div>
+                </div>
               )}
             </div>
           ))}
