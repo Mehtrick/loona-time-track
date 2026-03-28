@@ -1,0 +1,65 @@
+{
+  "name": "luna",
+  "version": "1.0.0",
+  "description": "Luna - Zeiterfassung für Freelancer",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "node server/index.js",
+    "electron:dev": "concurrently \"npm run dev:client\" \"node --experimental-modules electron/wait-and-start.js\"",
+    "electron:build": "vite build && electron-builder",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react-swc": "^3.7.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.0",
+    "electron": "^41.1.0",
+    "electron-builder": "^26.8.1",
+    "lucide-react": "^0.460.0",
+    "postcss": "^8.4.49",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "supertest": "^7.2.2",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.2"
+  },
+  "build": {
+    "appId": "com.luna.timetrack",
+    "productName": "Luna",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "server/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": ["de"]
+    }
+  }
+}

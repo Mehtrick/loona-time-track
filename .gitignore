@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+release/
+coverage/
+
+# Electron builder artifacts
+build/icon.png
+build/icon.ico
+
+# Data files (user data, not part of source)
+luna-data.json
+luna-settings.json
+
+# Test artifacts
+luna-test-data.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Env files
+.env
+.env.local
