@@ -1,10 +1,12 @@
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
-import { Moon, Clock, LayoutDashboard, Users, Tag, FileText } from 'lucide-react'
+import { Moon, Clock, LayoutDashboard, Users, Tag, FileText, Receipt, Settings } from 'lucide-react'
 import Dashboard from './pages/Dashboard'
 import TimeEntry from './pages/TimeEntry'
 import Entries from './pages/Entries'
 import Clients from './pages/Clients'
 import Tickets from './pages/Tickets'
+import InvoicesPage from './pages/Invoices'
+import SettingsPage from './pages/Settings'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -12,6 +14,8 @@ const navItems = [
   { to: '/buchungen', icon: FileText, label: 'Buchungen' },
   { to: '/tickets', icon: Tag, label: 'Tickets' },
   { to: '/kunden', icon: Users, label: 'Kunden' },
+  { to: '/abrechnungen', icon: Receipt, label: 'Abrechnungen' },
+  { to: '/einstellungen', icon: Settings, label: 'Einstellungen' },
 ]
 
 export default function App() {
@@ -72,6 +76,8 @@ export default function App() {
             <Route path="/buchungen" element={<Entries />} />
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/kunden" element={<Clients />} />
+            <Route path="/abrechnungen" element={<InvoicesPage />} />
+            <Route path="/einstellungen" element={<SettingsPage />} />
           </Routes>
         </div>
       </main>

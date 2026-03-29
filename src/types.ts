@@ -2,6 +2,8 @@ export interface Client {
   id: number
   name: string
   color: string
+  address_line1?: string
+  address_line2?: string
   planio_url?: string
   planio_api_key?: string
   created_at: string
@@ -44,7 +46,6 @@ export interface TimeEntry {
   ticket_name: string
   client_name: string
   client_color: string
-  client_id: number
   created_at: string
 }
 
@@ -54,4 +55,41 @@ export interface ClientSummary {
   client_color: string
   total_hours: number
   entry_count: number
+}
+
+export interface Settings {
+  company_name?: string
+  address_line1?: string
+  address_line2?: string
+  phone?: string
+  email?: string
+  tax_number?: string
+  bank_name?: string
+  bank_bic?: string
+  bank_iban?: string
+  hourly_rate?: number
+  invoice_note?: string
+  payment_terms_days?: number
+}
+
+export interface InvoiceItem {
+  entry_id: number
+  description: string
+  hours: number
+  rate: number
+  amount: number
+}
+
+export interface Invoice {
+  id: number
+  invoice_number: string
+  client_id: number
+  client_name?: string
+  client_color?: string
+  date: string
+  due_date: string
+  hourly_rate: number
+  items: InvoiceItem[]
+  total: number
+  created_at: string
 }

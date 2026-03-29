@@ -3,7 +3,7 @@ import cors from 'cors';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 // Current schema version - increment when adding a new migration
-export const CURRENT_VERSION = 2;
+export const CURRENT_VERSION = 3;
 
 // Migrations: each function transforms data from version N-1 to N.
 // Index 0 = migration to version 1, index 1 = migration to version 2, etc.
@@ -26,11 +26,19 @@ export const migrations = [
           entry.client_id = ticket.client_id;
         }
       }
-      // Ensure ticket_id field exists (may be null)
       if (entry.ticket_id === undefined) {
         entry.ticket_id = null;
       }
     }
+    return data;
+  },
+
+  // v2 -> v3: Add settings, invoices, lastInvoiceNumber; client address fields
+  (data) => {
+    data.settings = data.settings || {};
+    data.invoices = data.invoices || [];
+    data.lastInvoiceNumber = data.lastInvoiceNumber || '';
+    data.nextId.invoices = data.nextId.invoices || 1;
     return data;
   },
 ];
@@ -58,10 +66,13 @@ export function createApp(dataFilePath) {
   function emptyData() {
     return {
       version: CURRENT_VERSION,
+      settings: {},
       clients: [],
       tickets: [],
       entries: [],
-      nextId: { clients: 1, tickets: 1, entries: 1 },
+      invoices: [],
+      lastInvoiceNumber: '',
+      nextId: { clients: 1, tickets: 1, entries: 1, invoices: 1 },
     };
   }
 
@@ -98,6 +109,8 @@ export function createApp(dataFilePath) {
       id: data.nextId.clients++,
       name: req.body.name,
       color: req.body.color || '#6b1ae6',
+      address_line1: req.body.address_line1 || '',
+      address_line2: req.body.address_line2 || '',
       created_at: now(),
     };
     data.clients.push(client);
@@ -112,6 +125,8 @@ export function createApp(dataFilePath) {
     if (!client) return res.status(404).json({ error: 'Not found' });
     client.name = req.body.name ?? client.name;
     client.color = req.body.color ?? client.color;
+    client.address_line1 = req.body.address_line1 ?? client.address_line1 ?? '';
+    client.address_line2 = req.body.address_line2 ?? client.address_line2 ?? '';
     saveData(data);
     res.json(client);
   });
@@ -319,6 +334,273 @@ export function createApp(dataFilePath) {
     saveData(data);
     res.json({ ok: true });
   });
+
+  // === SETTINGS ===
+  app.get('/api/settings', (req, res) => {
+    const data = loadData();
+    res.json(data.settings || {});
+  });
+
+  app.put('/api/settings', (req, res) => {
+    const data = loadData();
+    data.settings = { ...data.settings, ...req.body };
+    saveData(data);
+    res.json(data.settings);
+  });
+
+  // === INVOICES ===
+
+  function suggestNextInvoiceNumber(lastNumber) {
+    const year = new Date().getFullYear().toString();
+    if (lastNumber && lastNumber.startsWith(year)) {
+      const num = parseInt(lastNumber.slice(4), 10);
+      return year + String(num + 1).padStart(6, '0');
+    }
+    if (lastNumber && /^\d+$/.test(lastNumber)) {
+      return String(parseInt(lastNumber, 10) + 1);
+    }
+    return year + '000001';
+  }
+
+  app.get('/api/invoices/next-number', (req, res) => {
+    const data = loadData();
+    res.json({ next: suggestNextInvoiceNumber(data.lastInvoiceNumber) });
+  });
+
+  app.get('/api/invoices', (req, res) => {
+    const data = loadData();
+    const invoices = data.invoices.map(inv => {
+      const client = data.clients.find(c => c.id === inv.client_id);
+      return { ...inv, client_name: client?.name || '', client_color: client?.color || '#666' };
+    });
+    invoices.sort((a, b) => b.date.localeCompare(a.date));
+    res.json(invoices);
+  });
+
+  app.get('/api/invoices/:id', (req, res) => {
+    const data = loadData();
+    const invoice = data.invoices.find(i => i.id === Number(req.params.id));
+    if (!invoice) return res.status(404).json({ error: 'Not found' });
+    const client = data.clients.find(c => c.id === invoice.client_id);
+    res.json({ ...invoice, client_name: client?.name || '', client_color: client?.color || '#666' });
+  });
+
+  app.post('/api/invoices', (req, res) => {
+    const data = loadData();
+    const { client_id, invoice_number, date, due_date, hourly_rate, entry_ids } = req.body;
+
+    if (!client_id || !invoice_number || !date || !entry_ids?.length) {
+      return res.status(400).json({ error: 'Pflichtfelder fehlen' });
+    }
+
+    // Check uniqueness of invoice number
+    if (data.invoices.some(i => i.invoice_number === invoice_number)) {
+      return res.status(409).json({ error: 'Rechnungsnummer existiert bereits' });
+    }
+
+    const rate = hourly_rate || data.settings?.hourly_rate || 80;
+
+    // Build line items from entries
+    const items = [];
+    for (const eid of entry_ids) {
+      const entry = data.entries.find(e => e.id === eid);
+      if (!entry) continue;
+      const ticket = entry.ticket_id ? data.tickets.find(t => t.id === entry.ticket_id) : null;
+      const desc = entry.description || ticket?.name || 'Dienstleistung';
+      const ticketRef = ticket?.reference ? ` (${ticket.reference})` : '';
+      items.push({
+        entry_id: eid,
+        description: desc + ticketRef,
+        hours: entry.hours,
+        rate,
+        amount: Math.round(entry.hours * rate * 100) / 100,
+      });
+    }
+
+    const total = Math.round(items.reduce((s, i) => s + i.amount, 0) * 100) / 100;
+
+    const invoice = {
+      id: data.nextId.invoices++,
+      invoice_number,
+      client_id,
+      date,
+      due_date: due_date || '',
+      hourly_rate: rate,
+      items,
+      total,
+      created_at: now(),
+    };
+
+    data.invoices.push(invoice);
+    data.lastInvoiceNumber = invoice_number;
+
+    // Mark entries as billed
+    for (const eid of entry_ids) {
+      const entry = data.entries.find(e => e.id === eid);
+      if (entry) entry.billed = invoice_number;
+    }
+
+    saveData(data);
+    res.json(invoice);
+  });
+
+  app.delete('/api/invoices/:id', (req, res) => {
+    const data = loadData();
+    const id = Number(req.params.id);
+    const invoice = data.invoices.find(i => i.id === id);
+    if (!invoice) return res.status(404).json({ error: 'Not found' });
+
+    // Unmark entries
+    for (const item of invoice.items) {
+      const entry = data.entries.find(e => e.id === item.entry_id);
+      if (entry && entry.billed === invoice.invoice_number) {
+        entry.billed = '';
+      }
+    }
+
+    data.invoices = data.invoices.filter(i => i.id !== id);
+    saveData(data);
+    res.json({ ok: true });
+  });
+
+  // PDF generation for invoices
+  app.get('/api/invoices/:id/pdf', async (req, res) => {
+    const data = loadData();
+    const invoice = data.invoices.find(i => i.id === Number(req.params.id));
+    if (!invoice) return res.status(404).json({ error: 'Not found' });
+
+    const client = data.clients.find(c => c.id === invoice.client_id);
+    const s = data.settings || {};
+
+    let PDFDocument;
+    try {
+      PDFDocument = (await import('pdfkit')).default;
+    } catch {
+      return res.status(500).json({ error: 'PDF-Bibliothek nicht verfuegbar' });
+    }
+
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    const buffers = [];
+    doc.on('data', chunk => buffers.push(chunk));
+    doc.on('end', () => {
+      const pdf = Buffer.concat(buffers);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="Rechnung_${invoice.invoice_number}.pdf"`,
+        'Content-Length': pdf.length,
+      });
+      res.send(pdf);
+    });
+
+    const pageW = 595.28;
+    const leftM = 50;
+    const rightCol = 320;
+    const lineH = 15;
+    let y;
+
+    // --- Sender block (top right) ---
+    y = 50;
+    doc.fontSize(10).font('Helvetica');
+    if (s.company_name) { doc.text(s.company_name, rightCol, y, { width: 230 }); y += lineH; }
+    if (s.address_line1) { doc.text(s.address_line1, rightCol, y, { width: 230 }); y += lineH; }
+    if (s.address_line2) { doc.text(s.address_line2, rightCol, y, { width: 230 }); y += lineH; }
+    if (s.phone) { doc.text(`Tel: ${s.phone}`, rightCol, y, { width: 230 }); y += lineH; }
+    if (s.email) { doc.text(`Email: ${s.email}`, rightCol, y, { width: 230 }); y += lineH; }
+    y += lineH;
+    if (s.tax_number) { doc.text(`Steuernummer: ${s.tax_number}`, rightCol, y, { width: 230 }); y += lineH; }
+    y += lineH;
+    doc.text(`Rechnungs-Nr: ${invoice.invoice_number}`, rightCol, y, { width: 230 }); y += lineH;
+    doc.text(`Rechnungsdatum: ${formatDateDE(invoice.date)}`, rightCol, y, { width: 230 }); y += lineH;
+    if (invoice.due_date) { doc.text(`Faelligkeitsdatum: ${formatDateDE(invoice.due_date)}`, rightCol, y, { width: 230 }); y += lineH; }
+
+    // --- Recipient block (left) ---
+    let ry = 130;
+    doc.fontSize(10).font('Helvetica');
+    doc.text('An', leftM, ry); ry += lineH;
+    doc.font('Helvetica-Bold').text(client?.name || '', leftM, ry, { width: 250 }); ry += lineH;
+    doc.font('Helvetica');
+    if (client?.address_line1) { doc.text(client.address_line1, leftM, ry, { width: 250 }); ry += lineH; }
+    if (client?.address_line2) { doc.text(client.address_line2, leftM, ry, { width: 250 }); ry += lineH; }
+
+    // --- Heading ---
+    const headY = Math.max(y, ry) + 30;
+    doc.fontSize(22).font('Helvetica').text('Rechnung', leftM, headY);
+
+    // --- Intro ---
+    let introY = headY + 40;
+    doc.fontSize(10).font('Helvetica');
+    doc.text('Sehr geehrte Damen und Herren,', leftM, introY, { width: 495 }); introY += lineH * 2;
+    doc.text('ich erlaube mir, Ihnen folgende Positionen zu berechnen.', leftM, introY, { width: 495 }); introY += lineH * 2;
+
+    // --- Table ---
+    const cols = { pos: leftM, desc: leftM + 45, qty: 310, unit: 360, price: 415, total: 475 };
+    const tableW = pageW - leftM * 2;
+    let ty = introY + 10;
+
+    // Header row
+    doc.font('Helvetica-Bold').fontSize(9);
+    doc.rect(leftM, ty - 3, tableW, 18).stroke();
+    doc.text('Position', cols.pos + 3, ty, { width: 40 });
+    doc.text('Bezeichnung', cols.desc, ty, { width: 200 });
+    doc.text('Menge', cols.qty, ty, { width: 45, align: 'right' });
+    doc.text('Einheit', cols.unit, ty, { width: 50 });
+    doc.text('Einzelpreis', cols.price, ty, { width: 55, align: 'right' });
+    doc.text('Gesamt', cols.total, ty, { width: 70, align: 'right' });
+    ty += 20;
+
+    // Data rows
+    doc.font('Helvetica').fontSize(9);
+    invoice.items.forEach((item, idx) => {
+      const descH = doc.heightOfString(item.description, { width: 200 });
+      const rowH = Math.max(descH + 6, 18);
+
+      if (ty + rowH > 760) { doc.addPage(); ty = 50; }
+
+      doc.rect(leftM, ty - 3, tableW, rowH).stroke();
+      doc.text(String(idx + 1), cols.pos + 3, ty, { width: 40 });
+      doc.text(item.description, cols.desc, ty, { width: 200 });
+      doc.text(String(item.hours).replace('.', ','), cols.qty, ty, { width: 45, align: 'right' });
+      doc.text('Stunden', cols.unit, ty, { width: 50 });
+      doc.text(fmtEur(item.rate), cols.price, ty, { width: 55, align: 'right' });
+      doc.text(fmtEur(item.amount), cols.total, ty, { width: 70, align: 'right' });
+      ty += rowH;
+    });
+
+    // Summe row
+    doc.font('Helvetica-Bold');
+    doc.rect(leftM, ty - 3, tableW, 20).stroke();
+    doc.text('Summe', cols.pos + 3, ty);
+    doc.text(fmtEur(invoice.total), cols.total, ty, { width: 70, align: 'right' });
+    ty += 30;
+
+    // Note
+    doc.font('Helvetica').fontSize(9);
+    const note = s.invoice_note || '';
+    if (note) {
+      doc.text(`Hinweis: ${note}`, leftM, ty, { width: 495 });
+    }
+
+    // Footer — bank details at page bottom (disable bottom margin to prevent auto-pagination)
+    const bankLine = [s.bank_name, s.bank_bic ? `BIC ${s.bank_bic}` : '', s.bank_iban ? `IBAN ${s.bank_iban}` : ''].filter(Boolean).join(' | ');
+    if (bankLine) {
+      const savedBottom = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
+      doc.fontSize(8).text(`Bankverbindung: ${bankLine}`, leftM, doc.page.height - 30, { width: 495, align: 'center' });
+      doc.page.margins.bottom = savedBottom;
+    }
+
+    doc.end();
+  });
+
+  function formatDateDE(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}.${m}.${y}`;
+  }
+
+  function fmtEur(num) {
+    return num.toFixed(2).replace('.', ',') + ' EUR';
+  }
 
   // === PLANIO INTEGRATION ===
 

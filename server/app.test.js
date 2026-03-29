@@ -659,3 +659,165 @@ describe('Planio API', () => {
     expect(res.status).toBe(400);
   });
 });
+
+// =====================
+// SETTINGS
+// =====================
+describe('Settings API', () => {
+  it('GET /api/settings returns empty object initially', async () => {
+    const res = await request(app).get('/api/settings');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({});
+  });
+
+  it('PUT /api/settings saves and returns settings', async () => {
+    const settings = { company_name: 'Test GmbH', hourly_rate: 95, bank_iban: 'DE123' };
+    const res = await request(app).put('/api/settings').send(settings);
+    expect(res.status).toBe(200);
+    expect(res.body.company_name).toBe('Test GmbH');
+    expect(res.body.hourly_rate).toBe(95);
+    expect(res.body.bank_iban).toBe('DE123');
+  });
+
+  it('PUT /api/settings merges with existing settings', async () => {
+    await request(app).put('/api/settings').send({ company_name: 'A' });
+    const res = await request(app).put('/api/settings').send({ hourly_rate: 100 });
+    expect(res.body.company_name).toBe('A');
+    expect(res.body.hourly_rate).toBe(100);
+  });
+});
+
+// =====================
+// INVOICES
+// =====================
+describe('Invoices API', () => {
+  it('GET /api/invoices returns empty array initially', async () => {
+    const res = await request(app).get('/api/invoices');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('GET /api/invoices/next-number returns default number', async () => {
+    const res = await request(app).get('/api/invoices/next-number');
+    expect(res.status).toBe(200);
+    expect(res.body.next).toMatch(/^\d{10}$/);
+  });
+
+  it('POST /api/invoices creates invoice and marks entries as billed', async () => {
+    // Setup: client + unbilled entries
+    await request(app).post('/api/clients').send({ name: 'Client A', address_line1: 'Street 1', address_line2: '12345 City' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 2, description: 'Work A' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-02', hours: 3, description: 'Work B' });
+
+    const res = await request(app).post('/api/invoices').send({
+      client_id: 1,
+      invoice_number: '2026000001',
+      date: '2026-01-15',
+      due_date: '2026-01-29',
+      hourly_rate: 100,
+      entry_ids: [1, 2],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.invoice_number).toBe('2026000001');
+    expect(res.body.client_id).toBe(1);
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.total).toBe(500); // 2*100 + 3*100
+
+    // GET list enriches with client_name
+    const list = await request(app).get('/api/invoices');
+    expect(list.body[0].client_name).toBe('Client A');
+
+    // Entries should now be billed
+    const entries = await request(app).get('/api/entries?show_billed=1');
+    expect(entries.body[0].billed).toBe('2026000001');
+    expect(entries.body[1].billed).toBe('2026000001');
+
+    // Unbilled view should be empty
+    const unbilled = await request(app).get('/api/entries');
+    expect(unbilled.body).toHaveLength(0);
+  });
+
+  it('GET /api/invoices/next-number increments after creating invoice', async () => {
+    await request(app).post('/api/clients').send({ name: 'C' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 1 });
+    await request(app).post('/api/invoices').send({
+      client_id: 1, invoice_number: '2026000005', date: '2026-01-15', due_date: '2026-01-29', hourly_rate: 80, entry_ids: [1],
+    });
+
+    const res = await request(app).get('/api/invoices/next-number');
+    expect(res.body.next).toBe('2026000006');
+  });
+
+  it('GET /api/invoices/:id returns single invoice', async () => {
+    await request(app).post('/api/clients').send({ name: 'C' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 1 });
+    await request(app).post('/api/invoices').send({
+      client_id: 1, invoice_number: 'R1', date: '2026-01-15', due_date: '2026-01-29', hourly_rate: 80, entry_ids: [1],
+    });
+
+    const res = await request(app).get('/api/invoices/1');
+    expect(res.status).toBe(200);
+    expect(res.body.invoice_number).toBe('R1');
+  });
+
+  it('GET /api/invoices/:id returns 404 for unknown invoice', async () => {
+    const res = await request(app).get('/api/invoices/999');
+    expect(res.status).toBe(404);
+  });
+
+  it('DELETE /api/invoices/:id removes invoice and unmarks entries', async () => {
+    await request(app).post('/api/clients').send({ name: 'C' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 1 });
+    await request(app).post('/api/invoices').send({
+      client_id: 1, invoice_number: 'DEL1', date: '2026-01-15', due_date: '2026-01-29', hourly_rate: 80, entry_ids: [1],
+    });
+
+    // Entry should be billed
+    let entries = await request(app).get('/api/entries?show_billed=1');
+    expect(entries.body[0].billed).toBe('DEL1');
+
+    // Delete invoice
+    const res = await request(app).delete('/api/invoices/1');
+    expect(res.status).toBe(200);
+
+    // Invoice gone
+    const invoices = await request(app).get('/api/invoices');
+    expect(invoices.body).toHaveLength(0);
+
+    // Entry should be unbilled again
+    entries = await request(app).get('/api/entries');
+    expect(entries.body).toHaveLength(1);
+    expect(entries.body[0].billed).toBe('');
+  });
+
+  it('GET /api/invoices/:id/pdf returns a PDF', async () => {
+    await request(app).post('/api/clients').send({ name: 'PDF Client', address_line1: 'Teststr. 1', address_line2: '10115 Berlin' });
+    await request(app).put('/api/settings').send({ company_name: 'Meine Firma', address_line1: 'Firmenstr. 5', address_line2: '80331 Muenchen', bank_iban: 'DE93999999990000000001', bank_bic: 'TESTDE88XXX', bank_name: 'Testbank AG' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 2, description: 'Dev work' });
+    await request(app).post('/api/invoices').send({
+      client_id: 1, invoice_number: 'PDF001', date: '2026-01-15', due_date: '2026-01-29', hourly_rate: 100, entry_ids: [1],
+    });
+
+    const res = await request(app).get('/api/invoices/1/pdf');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/pdf/);
+    expect(res.body.length).toBeGreaterThan(100);
+  });
+
+  it('POST /api/invoices returns 400 for missing fields', async () => {
+    const res = await request(app).post('/api/invoices').send({ client_id: 1 });
+    expect(res.status).toBe(400);
+  });
+
+  it('Client address fields are saved and returned', async () => {
+    const res = await request(app).post('/api/clients').send({
+      name: 'Addr Client', address_line1: 'Hauptstr. 10', address_line2: '50667 Koeln',
+    });
+    expect(res.body.address_line1).toBe('Hauptstr. 10');
+    expect(res.body.address_line2).toBe('50667 Koeln');
+
+    // Update
+    const upd = await request(app).put('/api/clients/1').send({ name: 'Addr Client', address_line1: 'Neue Str. 5' });
+    expect(upd.body.address_line1).toBe('Neue Str. 5');
+  });
+});

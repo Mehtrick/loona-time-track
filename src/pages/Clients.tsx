@@ -15,6 +15,8 @@ export default function Clients() {
   const [editId, setEditId] = useState<number | null>(null)
   const [name, setName] = useState('')
   const [color, setColor] = useState(PRESET_COLORS[0])
+  const [addressLine1, setAddressLine1] = useState('')
+  const [addressLine2, setAddressLine2] = useState('')
 
   // Planio config state (per-client inline editor)
   const [planioEditId, setPlanioEditId] = useState<number | null>(null)
@@ -34,6 +36,8 @@ export default function Clients() {
   function resetForm() {
     setName('')
     setColor(PRESET_COLORS[0])
+    setAddressLine1('')
+    setAddressLine2('')
     setEditId(null)
     setShowForm(false)
   }
@@ -42,9 +46,9 @@ export default function Clients() {
     e.preventDefault()
     if (!name.trim()) return
     if (editId) {
-      await api.updateClient(editId, { name: name.trim(), color })
+      await api.updateClient(editId, { name: name.trim(), color, address_line1: addressLine1.trim(), address_line2: addressLine2.trim() })
     } else {
-      await api.createClient({ name: name.trim(), color })
+      await api.createClient({ name: name.trim(), color, address_line1: addressLine1.trim(), address_line2: addressLine2.trim() })
     }
     resetForm()
     load()
@@ -54,6 +58,8 @@ export default function Clients() {
     setEditId(client.id)
     setName(client.name)
     setColor(client.color)
+    setAddressLine1(client.address_line1 || '')
+    setAddressLine2(client.address_line2 || '')
     setShowForm(true)
   }
 
@@ -127,6 +133,25 @@ export default function Clients() {
                   style={{ backgroundColor: c }}
                 />
               ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-night-200 mb-2">Anschrift (fuer Rechnungen)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={addressLine1}
+                onChange={e => setAddressLine1(e.target.value)}
+                placeholder="Strasse + Nr."
+                className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
+              />
+              <input
+                type="text"
+                value={addressLine2}
+                onChange={e => setAddressLine2(e.target.value)}
+                placeholder="PLZ + Ort"
+                className="w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
+              />
             </div>
           </div>
           <div className="flex gap-2">

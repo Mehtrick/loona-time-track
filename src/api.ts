@@ -19,15 +19,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+export function getPdfUrl(invoiceId: number): string {
+  return `${BASE}/invoices/${invoiceId}/pdf`
+}
+
 export const api = {
   // Clients
   getClients: () => request<any[]>('/clients'),
-  createClient: (data: { name: string; color: string }) =>
+  createClient: (data: any) =>
     request<any>('/clients', { method: 'POST', body: JSON.stringify(data) }),
-  updateClient: (id: number, data: { name: string; color: string }) =>
+  updateClient: (id: number, data: any) =>
     request<any>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteClient: (id: number) =>
     request<any>(`/clients/${id}`, { method: 'DELETE' }),
+
+  updateClientPlanio: (id: number, data: { planio_url: string; planio_api_key: string }) =>
+    request<any>(`/clients/${id}/planio`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Tickets
   getTickets: (params?: { client_id?: number; active?: number }) => {
@@ -42,9 +49,6 @@ export const api = {
     request<any>(`/tickets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTicket: (id: number) =>
     request<any>(`/tickets/${id}`, { method: 'DELETE' }),
-
-  updateClientPlanio: (id: number, data: { planio_url: string; planio_api_key: string }) =>
-    request<any>(`/clients/${id}/planio`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Time Entries
   getEntries: (params?: { client_id?: number; ticket_id?: number; show_billed?: boolean; from?: string; to?: string }) => {
@@ -63,6 +67,20 @@ export const api = {
     request<any>(`/entries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteEntry: (id: number) =>
     request<any>(`/entries/${id}`, { method: 'DELETE' }),
+
+  // Settings
+  getSettings: () => request<any>('/settings'),
+  updateSettings: (data: any) =>
+    request<any>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Invoices
+  getInvoices: () => request<any[]>('/invoices'),
+  getInvoice: (id: number) => request<any>(`/invoices/${id}`),
+  getNextInvoiceNumber: () => request<{ next: string }>('/invoices/next-number'),
+  createInvoice: (data: any) =>
+    request<any>('/invoices', { method: 'POST', body: JSON.stringify(data) }),
+  deleteInvoice: (id: number) =>
+    request<any>(`/invoices/${id}`, { method: 'DELETE' }),
 
   // Planio
   getPlanioPreview: (clientId: number) =>
