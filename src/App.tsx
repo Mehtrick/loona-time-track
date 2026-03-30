@@ -65,7 +65,7 @@ export default function App() {
 
         {/* Footer */}
         <div className="p-4 border-t border-night-700/50">
-          <p className="text-xs text-night-400 text-center">Loona v1.0</p>
+          <p className="text-xs text-night-400 text-center">Loona v{__APP_VERSION__}</p>
         </div>
       </aside>
 

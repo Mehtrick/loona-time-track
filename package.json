@@ -65,6 +65,17 @@
         "de"
       ]
     },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "category": "Office"
+    },
     "publish": {
       "provider": "github",
       "owner": "DEIN_GITHUB_USERNAME",
