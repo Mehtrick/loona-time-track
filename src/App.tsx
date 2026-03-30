@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import { ToastProvider } from './components/Toast'
 import { Moon, Clock, LayoutDashboard, Users, Tag, FileText, Receipt, Settings } from 'lucide-react'
@@ -8,6 +9,9 @@ import Clients from './pages/Clients'
 import Tickets from './pages/Tickets'
 import InvoicesPage from './pages/Invoices'
 import SettingsPage from './pages/Settings'
+import LockScreen from './pages/LockScreen'
+import SetupWizard from './pages/SetupWizard'
+import { api } from './api'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -21,6 +25,35 @@ const navItems = [
 
 export default function App() {
   const location = useLocation()
+  const [locked, setLocked] = useState<boolean | null>(null)
+  const [firstLaunch, setFirstLaunch] = useState(false)
+
+  useEffect(() => {
+    api.getStatus()
+      .then(s => { setLocked(s.locked); setFirstLaunch(s.firstLaunch) })
+      .catch(() => setLocked(false))
+  }, [])
+
+  if (locked === null) {
+    // Kurzes Laden – schwarzer Hintergrund verhindert Flackern
+    return <div className="min-h-screen bg-night-950" />
+  }
+
+  if (firstLaunch) {
+    return (
+      <ToastProvider>
+        <SetupWizard onComplete={() => setFirstLaunch(false)} />
+      </ToastProvider>
+    )
+  }
+
+  if (locked) {
+    return (
+      <ToastProvider>
+        <LockScreen onUnlocked={() => setLocked(false)} />
+      </ToastProvider>
+    )
+  }
 
   return (
     <ToastProvider>

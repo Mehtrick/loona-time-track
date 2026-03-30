@@ -23,7 +23,8 @@
 - 🧾 **Abrechnungen** — Professionelle PDF-Rechnungen mit optionaler Obergrenze erstellen
 - 🔗 **Planio-Import** — Tickets und Buchungen aus Planio/Redmine importieren
 - ⚙️ **Einstellungen** — Geschäftsdaten, Bankverbindung, Stundensatz und Rechnungshinweis
-- 💾 **Lokale Datenhaltung** — Alle Daten als verschlüsselte Datei (AES-256-GCM), kein Cloud-Konto erforderlich
+- 💾 **Lokale Datenhaltung** — Alle Daten lokal als JSON-Datei, optional mit AES-256-GCM verschlüsselt, kein Cloud-Konto erforderlich
+- 🔐 **Optionale Verschlüsselung** — Datenbank per Passwort schützen; Loona fragt beim Start nach dem Passwort
 - 🖥️ **Plattformübergreifend** — Windows, macOS (Intel + Apple Silicon) und Linux
 
 ---
@@ -70,29 +71,35 @@ Beim ersten Start fragt Loona, wo deine Datendatei (`loona-data.json`) gespeiche
 
 Den aktuell verwendeten Pfad siehst du unter **Loona → Aktuellen Datenpfad anzeigen**.
 
+Direkt im Anschluss bietet Loona an, die Datenbank mit einem Passwort zu schützen. Dieser Schritt kann übersprungen werden; die Verschlüsselung lässt sich jederzeit nachträglich unter **Einstellungen → Verschlüsselung** aktivieren.
+
 Alle Daten werden ausschließlich lokal gespeichert – keine Cloud, kein Konto.
 
 ---
 
 ## Datensicherheit & Verschlüsselung
 
-Loona verschlüsselt die Datendatei automatisch mit **AES-256-GCM** (authentifizierte Verschlüsselung). Die Daten auf der Festplatte sind dadurch für Dritte ohne den passenden Schlüssel nicht lesbar.
+Die Verschlüsselung ist **optional** und wird vom Nutzer selbst aktiviert. Standardmäßig wird die Datendatei unverschlüsselt gespeichert.
 
-### Schlüsselverwaltung
+### Verschlüsselung aktivieren
 
-Der Verschlüsselungsschlüssel wird beim ersten Start zufällig generiert und sicher in der **OS-Keychain** abgelegt:
+Beim ersten Start erscheint ein Einrichtungsassistent, der Verschlüsselung anbietet. Alternativ lässt sie sich jederzeit unter **Einstellungen → Verschlüsselung** ein- und ausschalten.
 
-| Plattform | Speicherort |
-|-----------|-------------|
-| **Windows** | Windows Credential Store (über Electron `safeStorage`) |
-| **macOS** | macOS Keychain (über Electron `safeStorage`) |
-| **Linux** | libsecret / GNOME Keyring – Fallback auf `loona.key` im App-Datenverzeichnis |
+Einmal aktiviert, wird die Datendatei mit **AES-256-GCM** und einem per **scrypt** abgeleiteten Schlüssel verschlüsselt. Das Passwort verlässt das Gerät nie.
 
-> **Hinweis:** Bei einem Umzug auf einen anderen Rechner muss die Datendatei zusammen mit dem Schlüssel migriert werden. Ohne den passenden Schlüssel können die Daten nicht entschlüsselt werden. Erstelle daher regelmäßig Backups deines App-Datenverzeichnisses.
+### Verhalten beim Start
 
-### Migration bestehender (unverschlüsselter) Daten
+Ist die Datenbank verschlüsselt, zeigt Loona beim Start einen **Sperrbildschirm** und lässt keine Aktionen zu, bis das korrekte Passwort eingegeben wurde.
 
-Wer von einer Loona-Version vor Einführung der Verschlüsselung aktualisiert, muss nichts tun. Loona erkennt beim Start automatisch unverschlüsselte Dateien und verschlüsselt sie sofort – die Daten bleiben vollständig erhalten.
+### Passwort ändern oder Verschlüsselung entfernen
+
+Beides ist jederzeit unter **Einstellungen → Verschlüsselung** möglich. Beim Deaktivieren wird die Datei sofort wieder im Klartext gespeichert.
+
+### Export & Backup
+
+Über **Einstellungen → Export** lassen sich alle Daten als unverschlüsselte JSON-Datei exportieren. So kannst du eine lesbare Sicherungskopie erstellen, unabhängig vom Verschlüsselungsstatus.
+
+> **Wichtig:** Das Passwort kann nicht wiederhergestellt werden. Vergisst du es, sind die Daten ohne Backup nicht mehr zugänglich. Erstelle daher regelmäßig Exporte als Sicherungskopie.
 
 ---
 

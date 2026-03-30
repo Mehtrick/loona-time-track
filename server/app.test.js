@@ -823,43 +823,20 @@ describe('Invoices API', () => {
 });
 
 // =====================
-// VERSCHLÜSSELUNG
+// VERSCHLÜSSELUNG (passwortbasiert)
 // =====================
-import { randomBytes } from 'crypto';
-import { encryptJson, decryptJson } from './app.js';
-
 const ENC_TEST_FILE = join(__dirname, '..', 'loona-test-enc.json');
 
-describe('Verschlüsselung (encryptJson / decryptJson)', () => {
-  it('verschlüsselt und entschlüsselt einen JSON-String korrekt', () => {
-    const key = randomBytes(32);
-    const original = JSON.stringify({ version: 3, clients: [{ id: 1, name: 'Test' }] });
-    const encrypted = encryptJson(original, key);
-    expect(encrypted.startsWith('LOONA_ENC_V1:')).toBe(true);
-    expect(encrypted).not.toContain('"Test"');
-    const decrypted = decryptJson(encrypted, key);
-    expect(decrypted).toBe(original);
-  });
-
-  it('schlägt fehl, wenn ein falscher Schlüssel verwendet wird', () => {
-    const key1 = randomBytes(32);
-    const key2 = randomBytes(32);
-    const encrypted = encryptJson('{"version":3}', key1);
-    expect(() => decryptJson(encrypted, key2)).toThrow();
-  });
-
-  it('jede Verschlüsselung erzeugt einen anderen Ciphertext (IV-Randomness)', () => {
-    const key = randomBytes(32);
-    const plaintext = '{"version":3}';
-    const enc1 = encryptJson(plaintext, key);
-    const enc2 = encryptJson(plaintext, key);
-    expect(enc1).not.toBe(enc2);
+describe('Status-Endpunkt', () => {
+  it('GET /api/status gibt locked: false und encrypted: false zurück wenn keine Datei existiert', async () => {
+    const res = await request(app).get('/api/status');
+    expect(res.status).toBe(200);
+    expect(res.body.locked).toBe(false);
+    expect(res.body.encrypted).toBe(false);
   });
 });
 
-describe('Datei-Verschlüsselung (createApp mit encryptionKey)', () => {
-  const encKey = randomBytes(32);
-
+describe('Passwortbasierte Datei-Verschlüsselung', () => {
   beforeEach(() => {
     if (existsSync(ENC_TEST_FILE)) unlinkSync(ENC_TEST_FILE);
   });
@@ -868,37 +845,67 @@ describe('Datei-Verschlüsselung (createApp mit encryptionKey)', () => {
     if (existsSync(ENC_TEST_FILE)) unlinkSync(ENC_TEST_FILE);
   });
 
-  it('speichert Daten verschlüsselt auf Platte', async () => {
-    const encApp = createApp(ENC_TEST_FILE, encKey);
-    await request(encApp).post('/api/clients').send({ name: 'Geheim GmbH' });
+  it('verschlüsselt die Datenbank nach POST /api/encryption', async () => {
+    const encApp = createApp(ENC_TEST_FILE);
+    await request(encApp).post('/api/clients').send({ name: 'Offen GmbH' });
+    await request(encApp).post('/api/encryption').send({ password: 'sicheresPasswort123' });
     const raw = readFileSync(ENC_TEST_FILE, 'utf-8');
-    expect(raw.startsWith('LOONA_ENC_V1:')).toBe(true);
-    expect(raw).not.toContain('Geheim GmbH');
+    expect(raw.startsWith('LOONA_ENC_PW_V1:')).toBe(true);
+    expect(raw).not.toContain('Offen GmbH');
   });
 
-  it('liest verschlüsselte Daten korrekt zurück', async () => {
-    const encApp = createApp(ENC_TEST_FILE, encKey);
-    await request(encApp).post('/api/clients').send({ name: 'Geheim GmbH' });
-    // Neue App-Instanz mit demselben Schlüssel – muss Daten lesen können
-    const encApp2 = createApp(ENC_TEST_FILE, encKey);
-    const res = await request(encApp2).get('/api/clients');
-    expect(res.status).toBe(200);
-    expect(res.body[0].name).toBe('Geheim GmbH');
+  it('sperrt die App nach Server-Neustart wenn Datei verschlüsselt ist', async () => {
+    const encApp = createApp(ENC_TEST_FILE);
+    await request(encApp).post('/api/clients').send({ name: 'Test GmbH' });
+    await request(encApp).post('/api/encryption').send({ password: 'sicheresPasswort123' });
+
+    // Neue App-Instanz – muss gesperrt sein
+    const lockedApp = createApp(ENC_TEST_FILE);
+    const statusRes = await request(lockedApp).get('/api/status');
+    expect(statusRes.body.locked).toBe(true);
+    expect(statusRes.body.encrypted).toBe(true);
+
+    // Normaler Zugriff verwehrt
+    const clientsRes = await request(lockedApp).get('/api/clients');
+    expect(clientsRes.status).toBe(503);
   });
 
-  it('migriert eine bestehende unverschlüsselte JSON-Datei automatisch', async () => {
-    // Unverschlüsselte Ausgangsdaten schreiben (wie vor der Verschlüsselungs-Migration)
-    const plainData = { version: 3, settings: {}, clients: [{ id: 1, name: 'Alt GmbH', color: '#aaa', created_at: '2024-01-01' }], tickets: [], entries: [], invoices: [], lastInvoiceNumber: '', nextId: { clients: 2, tickets: 1, entries: 1, invoices: 1 } };
-    writeFileSync(ENC_TEST_FILE, JSON.stringify(plainData, null, 2), 'utf-8');
+  it('entsperrt mit korrektem Passwort und verweigert mit falschem', async () => {
+    const encApp = createApp(ENC_TEST_FILE);
+    await request(encApp).post('/api/clients').send({ name: 'Test GmbH' });
+    await request(encApp).post('/api/encryption').send({ password: 'sicheresPasswort123' });
 
-    // App mit Schlüssel starten – muss Klartext lesen und verschlüsselt speichern
-    const encApp = createApp(ENC_TEST_FILE, encKey);
-    const res = await request(encApp).get('/api/clients');
-    expect(res.status).toBe(200);
-    expect(res.body[0].name).toBe('Alt GmbH');
+    const lockedApp = createApp(ENC_TEST_FILE);
 
-    // Datei muss jetzt verschlüsselt sein
+    // Falsches Passwort
+    const failRes = await request(lockedApp).post('/api/unlock').send({ password: 'falsch' });
+    expect(failRes.status).toBe(401);
+
+    // Richtiges Passwort
+    const okRes = await request(lockedApp).post('/api/unlock').send({ password: 'sicheresPasswort123' });
+    expect(okRes.status).toBe(200);
+    expect(okRes.body.ok).toBe(true);
+
+    // Jetzt Zugriff möglich
+    const clientsRes = await request(lockedApp).get('/api/clients');
+    expect(clientsRes.status).toBe(200);
+    expect(clientsRes.body[0].name).toBe('Test GmbH');
+  });
+
+  it('deaktiviert Verschlüsselung via DELETE /api/encryption', async () => {
+    const encApp = createApp(ENC_TEST_FILE);
+    await request(encApp).post('/api/clients').send({ name: 'Secret GmbH' });
+    await request(encApp).post('/api/encryption').send({ password: 'sicheresPasswort123' });
+
+    // Entsperren und dann Verschlüsselung entfernen
+    const unlockedApp = createApp(ENC_TEST_FILE);
+    await request(unlockedApp).post('/api/unlock').send({ password: 'sicheresPasswort123' });
+    await request(unlockedApp).delete('/api/encryption');
+
     const raw = readFileSync(ENC_TEST_FILE, 'utf-8');
-    expect(raw.startsWith('LOONA_ENC_V1:')).toBe(true);
+    expect(raw.startsWith('LOONA_ENC_PW_V1:')).toBe(false);
+    const parsed = JSON.parse(raw);
+    expect(parsed.clients[0].name).toBe('Secret GmbH');
   });
 });
+

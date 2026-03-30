@@ -87,4 +87,26 @@ export const api = {
     request<any>(`/planio/preview?client_id=${clientId}`),
   planioImport: (data: { client_id: number; import_tickets: boolean; import_entries: boolean }) =>
     request<any>('/planio/import', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Export / Import
+  getExportUrl: () => `${BASE}/export`,
+  importData: (data: { data: any; conflicts?: Record<string, 'overwrite' | 'skip'>; import_settings?: boolean }) =>
+    fetch(`${BASE}/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  // Status & Verschlüsselung
+  getStatus: () => request<{ locked: boolean; encrypted: boolean; firstLaunch: boolean }>('/status'),
+  unlock: (password: string) =>
+    fetch(`${BASE}/unlock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    }),
+  setEncryptionPassword: (password: string) =>
+    request<{ ok: boolean }>('/encryption', { method: 'POST', body: JSON.stringify({ password }) }),
+  removeEncryption: () =>
+    request<{ ok: boolean }>('/encryption', { method: 'DELETE' }),
 }

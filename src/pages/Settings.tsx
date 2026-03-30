@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Save, Info } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Save, Info, Download, Upload, AlertTriangle, X, Lock, LockOpen, KeyRound, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { api } from '../api'
 import { useToast } from '../components/Toast'
 import type { Settings as SettingsType } from '../types'
@@ -9,6 +9,134 @@ const INPUT_ERR = "w-full bg-night-800 border border-red-500/70 rounded-xl px-4 
 const LABEL = "block text-sm font-medium text-night-200 mb-1.5"
 
 const KLEINUNTERNEHMER_TEXT = 'Abrechnung nach § 19 Abs. 1 UStG ohne Umsatzsteuer (Kleinunternehmerregelung)'
+
+const ENTITY_LABELS: Record<string, string> = {
+  clients: 'Kunden',
+  tickets: 'Tickets',
+  entries: 'Buchungen',
+  invoices: 'Rechnungen',
+}
+
+interface ImportConflict {
+  entity: string
+  id: number
+  name: string
+}
+
+interface ConflictDialogProps {
+  conflicts: ImportConflict[]
+  onResolve: (resolutions: Record<string, 'overwrite' | 'skip'>) => void
+  onCancel: () => void
+}
+
+function ConflictDialog({ conflicts, onResolve, onCancel }: ConflictDialogProps) {
+  const [resolutions, setResolutions] = useState<Record<string, 'overwrite' | 'skip'>>(() => {
+    const init: Record<string, 'overwrite' | 'skip'> = {}
+    conflicts.forEach(c => { init[`${c.entity}:${c.id}`] = 'skip' })
+    return init
+  })
+
+  function setAll(value: 'overwrite' | 'skip') {
+    const next: Record<string, 'overwrite' | 'skip'> = {}
+    conflicts.forEach(c => { next[`${c.entity}:${c.id}`] = value })
+    setResolutions(next)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-night-900 border border-night-700/50 rounded-2xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-start gap-3 p-6 border-b border-night-700/50">
+          <AlertTriangle size={22} className="text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-white">ID-Konflikte beim Import</h3>
+            <p className="text-night-300 text-sm mt-0.5">
+              {conflicts.length} {conflicts.length === 1 ? 'Datensatz existiert' : 'Datensätze existieren'} bereits. Bitte wähle für jeden, ob er überschrieben oder übersprungen werden soll.
+            </p>
+          </div>
+          <button onClick={onCancel} className="text-night-400 hover:text-white transition-loona">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Schnellauswahl */}
+        <div className="flex gap-2 px-6 pt-4">
+          <button
+            type="button"
+            onClick={() => setAll('skip')}
+            className="text-xs px-3 py-1.5 rounded-lg bg-night-700 hover:bg-night-600 text-night-200 hover:text-white transition-loona"
+          >
+            Alle überspringen
+          </button>
+          <button
+            type="button"
+            onClick={() => setAll('overwrite')}
+            className="text-xs px-3 py-1.5 rounded-lg bg-amber-900/50 hover:bg-amber-800/50 text-amber-300 hover:text-amber-100 transition-loona"
+          >
+            Alle überschreiben
+          </button>
+        </div>
+
+        {/* Konflikt-Liste */}
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-2">
+          {conflicts.map(c => {
+            const key = `${c.entity}:${c.id}`
+            return (
+              <div key={key} className="flex items-center justify-between gap-3 bg-night-800 rounded-xl px-4 py-3">
+                <div className="min-w-0">
+                  <span className="text-xs text-night-400 uppercase tracking-wide">{ENTITY_LABELS[c.entity] ?? c.entity}</span>
+                  <p className="text-white text-sm truncate">{c.name} <span className="text-night-400">#{c.id}</span></p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setResolutions(r => ({ ...r, [key]: 'skip' }))}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-loona ${
+                      resolutions[key] === 'skip'
+                        ? 'bg-night-600 text-white'
+                        : 'bg-night-700/50 text-night-400 hover:text-white hover:bg-night-700'
+                    }`}
+                  >
+                    Überspringen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResolutions(r => ({ ...r, [key]: 'overwrite' }))}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-loona ${
+                      resolutions[key] === 'overwrite'
+                        ? 'bg-amber-700 text-amber-100'
+                        : 'bg-night-700/50 text-night-400 hover:text-amber-300 hover:bg-amber-900/40'
+                    }`}
+                  >
+                    Überschreiben
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 p-6 border-t border-night-700/50">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2.5 rounded-xl bg-night-700 hover:bg-night-600 text-white text-sm font-medium transition-loona"
+          >
+            Abbrechen
+          </button>
+          <button
+            type="button"
+            onClick={() => onResolve(resolutions)}
+            className="px-5 py-2.5 rounded-xl bg-loona-600 hover:bg-loona-500 text-white text-sm font-medium transition-loona loona-glow-hover"
+          >
+            Import fortsetzen
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function validateTaxNumber(val: string): boolean {
   if (!val) return true
@@ -37,8 +165,19 @@ export default function Settings() {
   const [s, setS] = useState<SettingsType>({})
   const [taxError, setTaxError] = useState('')
   const [ibanError, setIbanError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
+  const [pendingImport, setPendingImport] = useState<{ data: any; conflicts: ImportConflict[] } | null>(null)
+  const [encryptionEnabled, setEncryptionEnabled] = useState(false)
+  const [encPassword, setEncPassword] = useState('')
+  const [encPasswordConfirm, setEncPasswordConfirm] = useState('')
+  const [encShowPw, setEncShowPw] = useState(false)
+  const [encLoading, setEncLoading] = useState(false)
 
-  useEffect(() => { api.getSettings().then(setS) }, [])
+  useEffect(() => {
+    api.getSettings().then(setS)
+    api.getStatus().then(s => setEncryptionEnabled(s.encrypted)).catch(() => {})
+  }, [])
 
   function set(field: keyof SettingsType, value: any) {
     setS(prev => ({ ...prev, [field]: value }))
@@ -78,8 +217,102 @@ export default function Settings() {
     }
   }
 
+  function handleExport() {
+    const url = api.getExportUrl()
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `loona-export-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    let parsed: any
+    try {
+      const text = await file.text()
+      parsed = JSON.parse(text)
+    } catch {
+      toast('Datei konnte nicht gelesen werden. Bitte eine gültige JSON-Exportdatei wählen.', 'error')
+      return
+    }
+
+    await runImport(parsed, {})
+  }
+
+  async function runImport(importData: any, conflicts: Record<string, 'overwrite' | 'skip'>) {
+    setImporting(true)
+    try {
+      const res = await api.importData({ data: importData, conflicts })
+      if (res.status === 409) {
+        const body = await res.json()
+        setPendingImport({ data: importData, conflicts: body.conflicts })
+        return
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        toast(body.error || 'Fehler beim Import.', 'error')
+        return
+      }
+      const result = await res.json()
+      setPendingImport(null)
+      const total = Object.values(result.imported as Record<string, number>).reduce((a, b) => a + b, 0)
+      toast(`Import abgeschlossen: ${total} Datensatz/Datensätze hinzugefügt bzw. aktualisiert.`)
+    } catch {
+      toast('Import fehlgeschlagen.', 'error')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function handleConflictResolve(resolutions: Record<string, 'overwrite' | 'skip'>) {
+    if (!pendingImport) return
+    runImport(pendingImport.data, resolutions)
+  }
+
+  async function handleEnableEncryption() {
+    if (!encPassword) { toast('Bitte ein Passwort eingeben.', 'error'); return }
+    if (encPassword !== encPasswordConfirm) { toast('Passwörter stimmen nicht überein.', 'error'); return }
+    if (encPassword.length < 8) { toast('Das Passwort muss mindestens 8 Zeichen lang sein.', 'error'); return }
+    setEncLoading(true)
+    try {
+      await api.setEncryptionPassword(encPassword)
+      setEncryptionEnabled(true)
+      setEncPassword('')
+      setEncPasswordConfirm('')
+      toast('Datenbank wird ab jetzt verschlüsselt gespeichert.')
+    } catch {
+      toast('Fehler beim Aktivieren der Verschlüsselung.', 'error')
+    } finally {
+      setEncLoading(false)
+    }
+  }
+
+  async function handleDisableEncryption() {
+    setEncLoading(true)
+    try {
+      await api.removeEncryption()
+      setEncryptionEnabled(false)
+      toast('Verschlüsselung deaktiviert. Datenbank wird jetzt unverschlüsselt gespeichert.')
+    } catch {
+      toast('Fehler beim Deaktivieren der Verschlüsselung.', 'error')
+    } finally {
+      setEncLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-8 max-w-3xl">
+      {pendingImport && (
+        <ConflictDialog
+          conflicts={pendingImport.conflicts}
+          onResolve={handleConflictResolve}
+          onCancel={() => setPendingImport(null)}
+        />
+      )}
+
       <div>
         <h2 className="text-2xl font-bold text-white">Einstellungen</h2>
         <p className="text-night-300 mt-1">Deine Geschäftsdaten für Rechnungen</p>
@@ -191,6 +424,163 @@ export default function Settings() {
           Speichern
         </button>
       </form>
+
+      {/* Verschlüsselung */}
+      <section className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-5">
+        <div className="flex items-start gap-3">
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${encryptionEnabled ? 'bg-loona-600/20' : 'bg-night-800'}`}>
+            {encryptionEnabled
+              ? <Lock size={18} className="text-loona-300" />
+              : <LockOpen size={18} className="text-night-400" />}
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Verschlüsselung</h3>
+            <p className="text-night-400 text-sm mt-0.5">
+              {encryptionEnabled
+                ? 'Die Datenbank ist mit einem Passwort verschlüsselt (AES-256-GCM). Beim nächsten Start wird das Passwort abgefragt.'
+                : 'Die Datenbank ist aktuell unverschlüsselt. Setze ein Passwort um sie zu schützen.'}
+            </p>
+          </div>
+        </div>
+
+        {encryptionEnabled ? (
+          /* Verschlüsselung aktiv */
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-loona-600/10 border border-loona-600/20">
+              <Lock size={14} className="text-loona-300 flex-shrink-0" />
+              <span className="text-loona-200 text-sm">Datenbank ist verschlüsselt</span>
+            </div>
+
+            {/* Passwort ändern */}
+            <details className="group">
+              <summary className="cursor-pointer flex items-center gap-2 text-sm text-night-300 hover:text-white transition-loona list-none">
+                <KeyRound size={15} />
+                Passwort ändern
+              </summary>
+              <div className="mt-3 space-y-3">
+                <div className="relative">
+                  <input
+                    type={encShowPw ? 'text' : 'password'}
+                    value={encPassword}
+                    onChange={e => setEncPassword(e.target.value)}
+                    placeholder="Neues Passwort (min. 8 Zeichen)"
+                    className={INPUT + ' pr-11'}
+                  />
+                  <button type="button" onClick={() => setEncShowPw(v => !v)} tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-night-500 hover:text-night-300 transition-loona">
+                    {encShowPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <input
+                  type={encShowPw ? 'text' : 'password'}
+                  value={encPasswordConfirm}
+                  onChange={e => setEncPasswordConfirm(e.target.value)}
+                  placeholder="Passwort bestätigen"
+                  className={INPUT}
+                />
+                <button
+                  type="button"
+                  onClick={handleEnableEncryption}
+                  disabled={encLoading}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-loona-600 hover:bg-loona-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-loona"
+                >
+                  {encLoading ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
+                  Passwort ändern
+                </button>
+              </div>
+            </details>
+
+            <div className="border-t border-night-700/50 pt-4">
+              <button
+                type="button"
+                onClick={handleDisableEncryption}
+                disabled={encLoading}
+                className="flex items-center gap-2 px-4 py-2.5 bg-night-700 hover:bg-red-900/50 disabled:opacity-50 text-night-300 hover:text-red-300 rounded-xl text-sm font-medium transition-loona"
+              >
+                {encLoading ? <Loader2 size={15} className="animate-spin" /> : <LockOpen size={15} />}
+                Verschlüsselung deaktivieren
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Verschlüsselung inaktiv */
+          <div className="space-y-3">
+            <div className="relative">
+              <input
+                type={encShowPw ? 'text' : 'password'}
+                value={encPassword}
+                onChange={e => setEncPassword(e.target.value)}
+                placeholder="Neues Passwort (min. 8 Zeichen)"
+                className={INPUT + ' pr-11'}
+              />
+              <button type="button" onClick={() => setEncShowPw(v => !v)} tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-night-500 hover:text-night-300 transition-loona">
+                {encShowPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <input
+              type={encShowPw ? 'text' : 'password'}
+              value={encPasswordConfirm}
+              onChange={e => setEncPasswordConfirm(e.target.value)}
+              placeholder="Passwort bestätigen"
+              className={INPUT}
+            />
+            <button
+              type="button"
+              onClick={handleEnableEncryption}
+              disabled={encLoading}
+              className="flex items-center gap-2 px-5 py-2.5 bg-loona-600 hover:bg-loona-500 disabled:opacity-50 text-white rounded-xl font-medium text-sm transition-loona loona-glow-hover"
+            >
+              {encLoading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+              {encLoading ? 'Verschlüssele…' : 'Verschlüsselung aktivieren'}
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* Daten-Export / Import */}
+      <section className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-5">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Daten sichern & wiederherstellen</h3>
+          <p className="text-night-400 text-sm mt-1">
+            Exportiere alle Daten als unverschlüsselte JSON-Datei oder importiere eine Sicherung.
+            Beim Import werden vorhandene Datensätze nicht gelöscht – nur neue hinzugefügt oder auf Wunsch überschrieben.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={handleExport}
+            className="flex items-center gap-2 px-5 py-2.5 bg-night-700 hover:bg-night-600 text-white rounded-xl font-medium text-sm transition-loona"
+          >
+            <Upload size={16} />
+            Datenbank exportieren
+          </button>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="flex items-center gap-2 px-5 py-2.5 bg-night-700 hover:bg-night-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium text-sm transition-loona"
+          >
+            <Download size={16} />
+            {importing ? 'Importiere…' : 'Datenbank importieren'}
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+        </div>
+
+        <p className="text-night-500 text-xs">
+          Der Export enthält alle Kunden, Tickets, Buchungen und Rechnungen im Klartext (unverschlüsselt). Bewahre die Datei sicher auf.
+        </p>
+      </section>
     </div>
   )
 }

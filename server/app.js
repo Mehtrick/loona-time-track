@@ -1,44 +1,54 @@
 import express from 'express';
 import cors from 'cors';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes, scrypt } from 'crypto';
+import { promisify } from 'util';
 
-// Datei-Header für verschlüsselte Daten
-const ENCRYPTION_HEADER = 'LOONA_ENC_V1:';
+const scryptAsync = promisify(scrypt);
+
+// Datei-Header für passwortbasierte Verschlüsselung
+const LOONA_ENC_PW_HEADER = 'LOONA_ENC_PW_V1:';
+// Scrypt-Parameter: N=16384 entspricht ~100ms auf normaler Hardware
+const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
 
 /**
- * Verschlüsselt einen JSON-String mit AES-256-GCM.
- * @param {string} plaintext
- * @param {Buffer} key - 32-Byte-Schlüssel
- * @returns {string} Verschlüsselter String im Format LOONA_ENC_V1:<iv>:<authTag>:<ciphertext>
+ * Leitet einen 32-Byte-AES-Schlüssel aus Passwort + Salt via scrypt ab.
  */
-export function encryptJson(plaintext, key) {
+async function deriveKey(password, salt) {
+  return scryptAsync(password, salt, 32, SCRYPT_PARAMS);
+}
+
+/**
+ * Verschlüsselt plaintext mit dem gegebenen Schlüssel (AES-256-GCM).
+ * Kodierung: LOONA_ENC_PW_V1:<saltHex>:<ivHex>:<authTagHex>:<ciphertextHex>
+ */
+function encryptWithKey(plaintext, key, salt) {
   const iv = randomBytes(16);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   let encrypted = cipher.update(plaintext, 'utf-8', 'hex');
   encrypted += cipher.final('hex');
   const authTag = cipher.getAuthTag().toString('hex');
-  return `${ENCRYPTION_HEADER}${iv.toString('hex')}:${authTag}:${encrypted}`;
+  return `${LOONA_ENC_PW_HEADER}${salt.toString('hex')}:${iv.toString('hex')}:${authTag}:${encrypted}`;
 }
 
 /**
- * Entschlüsselt einen mit encryptJson verschlüsselten String.
- * @param {string} ciphertext
- * @param {Buffer} key - 32-Byte-Schlüssel
- * @returns {string} Entschlüsselter JSON-String
+ * Entschlüsselt einen LOONA_ENC_PW_V1-String mit dem gegebenen Schlüssel.
+ * Wirft einen Fehler wenn Schlüssel oder Daten ungültig sind.
  */
-export function decryptJson(ciphertext, key) {
-  const rest = ciphertext.slice(ENCRYPTION_HEADER.length);
+function decryptWithKey(raw, key) {
+  const rest = raw.slice(LOONA_ENC_PW_HEADER.length);
+  // Format: <saltHex>:<ivHex>:<authTagHex>:<ciphertextHex>
   const firstColon = rest.indexOf(':');
   const secondColon = rest.indexOf(':', firstColon + 1);
-  const ivHex = rest.slice(0, firstColon);
-  const authTagHex = rest.slice(firstColon + 1, secondColon);
-  const encryptedHex = rest.slice(secondColon + 1);
+  const thirdColon = rest.indexOf(':', secondColon + 1);
+  const ivHex = rest.slice(firstColon + 1, secondColon);
+  const authTagHex = rest.slice(secondColon + 1, thirdColon);
+  const ciphertextHex = rest.slice(thirdColon + 1);
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
   const decipher = createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(authTag);
-  let decrypted = decipher.update(encryptedHex, 'hex', 'utf-8');
+  let decrypted = decipher.update(ciphertextHex, 'hex', 'utf-8');
   decrypted += decipher.final('utf-8');
   return decrypted;
 }
@@ -99,10 +109,29 @@ export function migrateData(data) {
   return { data, migrated: true };
 }
 
-export function createApp(dataFilePath, encryptionKey = null) {
+export function createApp(dataFilePath) {
   const app = express();
   app.use(cors());
   app.use(express.json());
+
+  // Aktueller Entschlüsselungsschlüssel (Buffer wenn entsperrt, null wenn unverschlüsselt oder gesperrt)
+  let currentKey = null;
+  // Der Salt der beim aktuellen Schlüssel verwendet wurde (muss beim Speichern wiederverwendet werden)
+  let currentSalt = null;
+  // true wenn die Datei passwortgeschützt ist und noch nicht entsperrt wurde
+  let locked = false;
+
+  function isFilePasswordEncrypted() {
+    if (!existsSync(dataFilePath)) return false;
+    try {
+      return readFileSync(dataFilePath, 'utf-8').startsWith(LOONA_ENC_PW_HEADER);
+    } catch {
+      return false;
+    }
+  }
+
+  // Sperrzustand beim Start initialisieren
+  locked = isFilePasswordEncrypted();
 
   function emptyData() {
     return {
@@ -119,26 +148,23 @@ export function createApp(dataFilePath, encryptionKey = null) {
 
   function serializeData(data) {
     const json = JSON.stringify(data, null, 2);
-    return encryptionKey ? encryptJson(json, encryptionKey) : json;
+    if (currentKey) {
+      return encryptWithKey(json, currentKey, currentSalt);
+    }
+    return json;
   }
 
   function loadData() {
-    if (!existsSync(dataFilePath)) {
-      return emptyData();
-    }
+    if (!existsSync(dataFilePath)) return emptyData();
     const raw = readFileSync(dataFilePath, 'utf-8');
-    const isEncrypted = raw.startsWith(ENCRYPTION_HEADER);
     let parsed;
-    if (isEncrypted) {
-      parsed = JSON.parse(decryptJson(raw, encryptionKey));
+    if (raw.startsWith(LOONA_ENC_PW_HEADER)) {
+      parsed = JSON.parse(decryptWithKey(raw, currentKey));
     } else {
       parsed = JSON.parse(raw);
     }
     const { data, migrated } = migrateData(parsed);
-    // Speichern wenn: Schema migriert ODER Datei war unverschlüsselt aber Schlüssel ist gesetzt (Migration zu Verschlüsselung)
-    if (migrated || (encryptionKey && !isEncrypted)) {
-      writeFileSync(dataFilePath, serializeData(data), 'utf-8');
-    }
+    if (migrated) writeFileSync(dataFilePath, serializeData(data), 'utf-8');
     return data;
   }
 
@@ -150,6 +176,44 @@ export function createApp(dataFilePath, encryptionKey = null) {
   function now() {
     return new Date().toISOString();
   }
+
+  // === STATUS & ENTSPERREN (auch im gesperrten Zustand erreichbar) ===
+
+  app.get('/api/status', (req, res) => {
+    const encrypted = isFilePasswordEncrypted();
+    const firstLaunch = !existsSync(dataFilePath);
+    res.json({ locked, encrypted, firstLaunch });
+  });
+
+  app.post('/api/unlock', async (req, res) => {
+    const { password } = req.body || {};
+    if (!password) return res.status(400).json({ error: 'Kein Passwort angegeben.' });
+    if (!isFilePasswordEncrypted()) {
+      locked = false;
+      return res.json({ ok: true });
+    }
+    try {
+      const raw = readFileSync(dataFilePath, 'utf-8');
+      const rest = raw.slice(LOONA_ENC_PW_HEADER.length);
+      const saltHex = rest.slice(0, rest.indexOf(':'));
+      const salt = Buffer.from(saltHex, 'hex');
+      const key = await deriveKey(password, salt);
+      // Entschlüsselung verifizieren – wirft einen Fehler bei falschem Passwort
+      JSON.parse(decryptWithKey(raw, key));
+      currentKey = key;
+      currentSalt = salt;
+      locked = false;
+      res.json({ ok: true });
+    } catch {
+      res.status(401).json({ error: 'Falsches Passwort.' });
+    }
+  });
+
+  // === LOCK-GUARD: alle folgenden Routen sind nur im entsperrten Zustand erreichbar ===
+  app.use((req, res, next) => {
+    if (locked) return res.status(503).json({ error: 'locked' });
+    next();
+  });
 
   // === CLIENTS ===
   app.get('/api/clients', (req, res) => {
@@ -919,6 +983,131 @@ export function createApp(dataFilePath, encryptionKey = null) {
       res.json({ ok: true, tickets_imported: ticketsImported, entries_imported: entriesImported });
     } catch (err) {
       res.status(502).json({ error: `Planio nicht erreichbar: ${err.message}` });
+    }
+  });
+
+  // === DATEN-EXPORT / IMPORT ===
+
+  // GET /api/export  – gibt die gesamte Datenbank als unverschlüsseltes JSON zurück
+  app.get('/api/export', (req, res) => {
+    const data = loadData();
+    const json = JSON.stringify(data, null, 2);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="loona-export.json"');
+    res.send(json);
+  });
+
+  // POST /api/import  – fügt Datensätze aus einem Import-JSON hinzu
+  // Body: { data: <loona-export JSON>, conflicts: { clients, tickets, entries, invoices } }
+  //   conflicts ist ein Objekt mit IDs als keys und "overwrite" | "skip" als Wert
+  // Antwort: { conflicts: [...], imported: { clients, tickets, entries, invoices } }
+  //   Wenn conflicts leer ist, wurden alle Datensätze importiert.
+  //   Wenn conflicts nicht leer ist, muss der Client erneut mit gefülltem conflicts-Objekt senden.
+  app.post('/api/import', (req, res) => {
+    const incoming = req.body?.data;
+    const conflictResolutions = req.body?.conflicts || {};
+
+    if (!incoming || typeof incoming !== 'object') {
+      return res.status(400).json({ error: 'Kein gültiges Import-Objekt übergeben.' });
+    }
+
+    const entities = ['clients', 'tickets', 'entries', 'invoices'];
+    const current = loadData();
+
+    // Konflikte ermitteln: IDs die bereits existieren und noch keine Auflösung haben
+    const pendingConflicts = [];
+    for (const entity of entities) {
+      const incoming_items = incoming[entity] || [];
+      const existing_ids = new Set((current[entity] || []).map(x => x.id));
+      for (const item of incoming_items) {
+        const key = `${entity}:${item.id}`;
+        if (existing_ids.has(item.id) && !conflictResolutions[key]) {
+          pendingConflicts.push({ entity, id: item.id, name: item.name || item.description || String(item.id) });
+        }
+      }
+    }
+
+    // Noch ungeklärte Konflikte → Frontend muss fragen
+    if (pendingConflicts.length > 0) {
+      return res.status(409).json({ conflicts: pendingConflicts });
+    }
+
+    // Import durchführen
+    const imported = { clients: 0, tickets: 0, entries: 0, invoices: 0 };
+
+    for (const entity of entities) {
+      const incoming_items = incoming[entity] || [];
+      const existing_ids = new Map((current[entity] || []).map(x => [x.id, true]));
+
+      for (const item of incoming_items) {
+        const key = `${entity}:${item.id}`;
+        const resolution = conflictResolutions[key];
+
+        if (existing_ids.has(item.id)) {
+          if (resolution === 'overwrite') {
+            const idx = current[entity].findIndex(x => x.id === item.id);
+            if (idx !== -1) current[entity][idx] = item;
+            imported[entity]++;
+          }
+          // 'skip' → nichts tun
+        } else {
+          current[entity].push(item);
+          imported[entity]++;
+        }
+      }
+
+      // nextId auf Maximum setzen damit keine Kollisionen entstehen
+      const allIds = (current[entity] || []).map(x => x.id);
+      if (allIds.length > 0) {
+        const maxId = Math.max(...allIds);
+        const entityKey = entity === 'invoices' ? 'invoices' : entity;
+        if (current.nextId[entityKey] <= maxId) {
+          current.nextId[entityKey] = maxId + 1;
+        }
+      }
+    }
+
+    // Settings aus Import übernehmen falls vorhanden und explizit gewünscht
+    if (req.body?.import_settings && incoming.settings) {
+      current.settings = { ...current.settings, ...incoming.settings };
+    }
+
+    saveData(current);
+    res.json({ ok: true, imported });
+  });
+
+  // === VERSCHLÜSSELUNGSVERWALTUNG ===
+
+  // Passwort setzen oder ändern (Datenbank wird (neu)verschlüsselt)
+  app.post('/api/encryption', async (req, res) => {
+    const { password } = req.body || {};
+    if (!password) return res.status(400).json({ error: 'Kein Passwort angegeben.' });
+    try {
+      const data = loadData();
+      const salt = randomBytes(32);
+      const key = await deriveKey(password, salt);
+      const json = JSON.stringify(data, null, 2);
+      writeFileSync(dataFilePath, encryptWithKey(json, key, salt), 'utf-8');
+      currentKey = key;
+      currentSalt = salt;
+      locked = false;
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: `Verschlüsselung fehlgeschlagen: ${err.message}` });
+    }
+  });
+
+  // Verschlüsselung deaktivieren (Datenbank wird im Klartext gespeichert)
+  app.delete('/api/encryption', (req, res) => {
+    try {
+      const data = loadData();
+      currentKey = null;
+      currentSalt = null;
+      locked = false;
+      writeFileSync(dataFilePath, JSON.stringify(data, null, 2), 'utf-8');
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: `Entschlüsselung fehlgeschlagen: ${err.message}` });
     }
   });
 
