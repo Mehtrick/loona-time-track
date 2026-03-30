@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Users, Plus, Pencil, Trash2, X, Check, Link, ChevronDown, ChevronUp, Download } from 'lucide-react'
 import { api } from '../api'
+import { useToast } from '../components/Toast'
 import type { Client } from '../types'
 import PlanioImport from './PlanioImport'
 
@@ -10,6 +11,7 @@ const PRESET_COLORS = [
 ]
 
 export default function Clients() {
+  const { toast } = useToast()
   const [clients, setClients] = useState<Client[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
@@ -45,13 +47,19 @@ export default function Clients() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    if (editId) {
-      await api.updateClient(editId, { name: name.trim(), color, address_line1: addressLine1.trim(), address_line2: addressLine2.trim() })
-    } else {
-      await api.createClient({ name: name.trim(), color, address_line1: addressLine1.trim(), address_line2: addressLine2.trim() })
+    try {
+      if (editId) {
+        await api.updateClient(editId, { name: name.trim(), color, address_line1: addressLine1.trim(), address_line2: addressLine2.trim() })
+        toast(`Kunde "${name.trim()}" aktualisiert.`)
+      } else {
+        await api.createClient({ name: name.trim(), color, address_line1: addressLine1.trim(), address_line2: addressLine2.trim() })
+        toast(`Kunde "${name.trim()}" angelegt.`)
+      }
+      resetForm()
+      load()
+    } catch {
+      toast('Fehler beim Speichern des Kunden.', 'error')
     }
-    resetForm()
-    load()
   }
 
   function startEdit(client: Client) {
@@ -63,10 +71,15 @@ export default function Clients() {
     setShowForm(true)
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: number, clientName: string) {
     if (!confirm('Kunden und alle zugehörigen Tickets und Buchungen löschen?')) return
-    await api.deleteClient(id)
-    load()
+    try {
+      await api.deleteClient(id)
+      toast(`Kunde "${clientName}" gelöscht.`)
+      load()
+    } catch {
+      toast('Fehler beim Löschen des Kunden.', 'error')
+    }
   }
 
   function openPlanioConfig(client: Client) {
@@ -77,10 +90,16 @@ export default function Clients() {
 
   async function savePlanioConfig(clientId: number) {
     setPlanioSaving(true)
-    await api.updateClientPlanio(clientId, { planio_url: planioUrl.trim(), planio_api_key: planioKey.trim() })
-    setPlanioSaving(false)
-    setPlanioEditId(null)
-    load()
+    try {
+      await api.updateClientPlanio(clientId, { planio_url: planioUrl.trim(), planio_api_key: planioKey.trim() })
+      toast('Planio-Konfiguration gespeichert.')
+      setPlanioEditId(null)
+      load()
+    } catch {
+      toast('Fehler beim Speichern der Planio-Konfiguration.', 'error')
+    } finally {
+      setPlanioSaving(false)
+    }
   }
 
   return (
@@ -191,7 +210,7 @@ export default function Clients() {
           {clients.map(client => (
             <div key={client.id} className="bg-night-900 rounded-xl border border-night-700/50 overflow-hidden">
               {/* Client row */}
-              <div className="px-6 py-4 flex items-center justify-between group hover:bg-night-850 transition-loona">
+              <div className="px-6 py-4 flex items-center justify-between hover:bg-night-850 transition-loona">
                 <div className="flex items-center gap-4">
                   <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: client.color }} />
                   <span className="text-white font-medium">{client.name}</span>
@@ -201,7 +220,7 @@ export default function Clients() {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-loona">
+                <div className="flex items-center gap-1">
                   {client.planio_url && (
                     <button
                       onClick={() => setImportClient(client)}
@@ -232,7 +251,7 @@ export default function Clients() {
                     <Pencil size={14} />
                   </button>
                   <button
-                    onClick={() => handleDelete(client.id)}
+                    onClick={() => handleDelete(client.id, client.name)}
                     className="p-2 rounded-lg text-night-400 hover:text-red-400 hover:bg-night-800 transition-loona"
                   >
                     <Trash2 size={14} />

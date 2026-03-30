@@ -1,4 +1,5 @@
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
+import { ToastProvider } from './components/Toast'
 import { Moon, Clock, LayoutDashboard, Users, Tag, FileText, Receipt, Settings } from 'lucide-react'
 import Dashboard from './pages/Dashboard'
 import TimeEntry from './pages/TimeEntry'
@@ -22,6 +23,7 @@ export default function App() {
   const location = useLocation()
 
   return (
+    <ToastProvider>
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
       <aside className="w-64 bg-night-900 border-r border-night-700/50 flex flex-col flex-shrink-0">
@@ -82,5 +84,6 @@ export default function App() {
         </div>
       </main>
     </div>
+    </ToastProvider>
   )
 }

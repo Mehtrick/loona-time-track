@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Receipt, Plus, Trash2, FileDown, X, Check } from 'lucide-react'
 import { api, getPdfUrl } from '../api'
+import { useToast } from '../components/Toast'
 import type { Client, Invoice, TimeEntry } from '../types'
 
 const INPUT = "w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-loona-500 focus:ring-1 focus:ring-loona-500 transition-loona"
@@ -27,10 +28,10 @@ function addDays(iso: string, days: number) {
 }
 
 export default function Invoices() {
+  const { toast } = useToast()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [showForm, setShowForm] = useState(false)
 
-  // Form state
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null)
   const [invoiceNumber, setInvoiceNumber] = useState('')
@@ -43,45 +44,52 @@ export default function Invoices() {
   const [creating, setCreating] = useState(false)
 
   function load() {
-    api.getInvoices().then(setInvoices)
+    api.getInvoices().then(setInvoices).catch(() => toast('Fehler beim Laden der Rechnungen.', 'error'))
   }
 
   useEffect(() => { load() }, [])
 
   async function openForm() {
-    const [cls, settings, next] = await Promise.all([
-      api.getClients(),
-      api.getSettings(),
-      api.getNextInvoiceNumber(),
-    ])
-    setClients(cls)
-    setInvoiceNumber(next.next)
-    setHourlyRate(settings.hourly_rate ?? 80)
-    setPaymentDays(settings.payment_terms_days ?? 14)
-    setInvoiceDate(todayISO())
-    setMaxAmount(undefined)
-    setSelectedClientId(null)
-    setEntries([])
-    setSelectedEntryIds(new Set())
-    setShowForm(true)
+    try {
+      const [cls, settings, next] = await Promise.all([
+        api.getClients(),
+        api.getSettings(),
+        api.getNextInvoiceNumber(),
+      ])
+      setClients(cls)
+      setInvoiceNumber(next.next)
+      setHourlyRate(settings.hourly_rate ?? 80)
+      setPaymentDays(settings.payment_terms_days ?? 14)
+      setInvoiceDate(todayISO())
+      setMaxAmount(undefined)
+      setSelectedClientId(null)
+      setEntries([])
+      setSelectedEntryIds(new Set())
+      setShowForm(true)
+    } catch {
+      toast('Fehler beim Laden der Formulardaten.', 'error')
+    }
   }
 
   async function onClientChange(clientId: number) {
     setSelectedClientId(clientId)
-    const ents = await api.getEntries({ client_id: clientId, show_billed: false })
-    // Sort oldest first
-    ents.sort((a: TimeEntry, b: TimeEntry) => a.date.localeCompare(b.date))
-    setEntries(ents)
-    // Auto-select all (or up to maxAmount)
-    autoSelect(ents, hourlyRate, maxAmount)
+    try {
+      const ents = await api.getEntries({ client_id: clientId, show_billed: false })
+      ents.sort((a: TimeEntry, b: TimeEntry) => a.date.localeCompare(b.date))
+      setEntries(ents)
+      autoSelect(ents, hourlyRate, maxAmount)
+    } catch {
+      toast('Fehler beim Laden der Buchungen.', 'error')
+    }
   }
 
+  // Greedy fill: skip entries that don't fit, try smaller ones — don't stop at first miss
   function autoSelect(ents: TimeEntry[], rate: number, max?: number) {
     const ids = new Set<number>()
     let sum = 0
     for (const e of ents) {
       const amount = e.hours * rate
-      if (max !== undefined && max > 0 && sum + amount > max) break
+      if (max !== undefined && max > 0 && sum + amount > max) continue // skip, don't stop
       ids.add(e.id)
       sum += amount
     }
@@ -133,15 +141,28 @@ export default function Invoices() {
       })
       setShowForm(false)
       load()
+      toast(`Rechnung ${invoiceNumber.trim()} wurde erstellt.`)
+    } catch (err: any) {
+      const msg = err?.message || ''
+      if (msg.includes('409') || msg.includes('existiert')) {
+        toast('Diese Rechnungsnummer existiert bereits.', 'error')
+      } else {
+        toast('Fehler beim Erstellen der Rechnung.', 'error')
+      }
     } finally {
       setCreating(false)
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('Rechnung loeschen? Die zugehoerigen Buchungen werden wieder als offen markiert.')) return
-    await api.deleteInvoice(id)
-    load()
+  async function handleDelete(id: number, invoiceNum: string) {
+    if (!confirm('Rechnung löschen? Die zugehörigen Buchungen werden wieder als offen markiert.')) return
+    try {
+      await api.deleteInvoice(id)
+      load()
+      toast(`Rechnung ${invoiceNum} wurde gelöscht.`)
+    } catch {
+      toast('Fehler beim Löschen der Rechnung.', 'error')
+    }
   }
 
   return (
@@ -176,7 +197,7 @@ export default function Invoices() {
                 onChange={e => e.target.value ? onClientChange(Number(e.target.value)) : setSelectedClientId(null)}
                 required
               >
-                <option value="">Kunde waehlen...</option>
+                <option value="">Kunde wählen...</option>
                 {clients.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
@@ -184,7 +205,13 @@ export default function Invoices() {
             </div>
             <div>
               <label className={LABEL}>Rechnungsnummer</label>
-              <input className={INPUT} value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} required />
+              <input
+                className={INPUT}
+                value={invoiceNumber}
+                onChange={e => setInvoiceNumber(e.target.value)}
+                placeholder="z.B. 2026000001"
+                required
+              />
             </div>
             <div>
               <label className={LABEL}>Rechnungsdatum</label>
@@ -221,7 +248,7 @@ export default function Invoices() {
               <div className="flex items-center justify-between">
                 <label className={LABEL + ' mb-0'}>Offene Buchungen</label>
                 <span className="text-xs text-night-400">
-                  {selectedEntryIds.size} von {entries.length} ausgewaehlt
+                  {selectedEntryIds.size} von {entries.length} ausgewählt
                 </span>
               </div>
               <div className="max-h-80 overflow-y-auto rounded-xl border border-night-700/50">
@@ -268,7 +295,6 @@ export default function Invoices() {
                 </table>
               </div>
 
-              {/* Totals */}
               <div className="flex justify-end">
                 <div className="bg-night-800 rounded-xl px-6 py-3 text-right space-y-1">
                   <div className="text-night-300 text-sm">{selectedHours.toFixed(2)} Stunden x {fmtEur(hourlyRate)}</div>
@@ -283,7 +309,7 @@ export default function Invoices() {
 
           {selectedClientId && entries.length === 0 && (
             <div className="text-center py-8 text-night-400">
-              Keine offenen Buchungen fuer diesen Kunden vorhanden.
+              Keine offenen Buchungen für diesen Kunden vorhanden.
             </div>
           )}
 
@@ -325,43 +351,38 @@ export default function Invoices() {
           {invoices.map(inv => (
             <div
               key={inv.id}
-              className="bg-night-900 rounded-xl border border-night-700/50 px-6 py-4 flex items-center justify-between group hover:bg-night-850 transition-loona"
+              className="bg-night-900 rounded-xl border border-night-700/50 px-6 py-4 flex items-center justify-between hover:bg-night-850 transition-loona"
             >
               <div className="flex items-center gap-4">
-                <div
-                  className="w-4 h-4 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: inv.client_color || '#6b1ae6' }}
-                />
+                <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: inv.client_color || '#6b1ae6' }} />
                 <div>
                   <div className="flex items-center gap-3">
                     <span className="text-white font-semibold font-mono">{inv.invoice_number}</span>
                     <span className="text-night-300">{inv.client_name}</span>
                   </div>
                   <div className="text-xs text-night-400 mt-0.5">
-                    {fmtDate(inv.date)} &middot; Faellig: {fmtDate(inv.due_date)} &middot; {inv.items?.length || 0} Positionen
+                    {fmtDate(inv.date)} · Fällig: {fmtDate(inv.due_date)} · {inv.items?.length || 0} Positionen
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <span className="text-white font-bold text-lg">{fmtEur(inv.total)}</span>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-loona">
-                  <a
-                    href={getPdfUrl(inv.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-lg text-night-400 hover:text-loona-300 hover:bg-night-800 transition-loona"
-                    title="PDF herunterladen"
-                  >
-                    <FileDown size={16} />
-                  </a>
-                  <button
-                    onClick={() => handleDelete(inv.id)}
-                    className="p-2 rounded-lg text-night-400 hover:text-red-400 hover:bg-night-800 transition-loona"
-                    title="Rechnung loeschen"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                <a
+                  href={getPdfUrl(inv.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg text-night-400 hover:text-loona-300 hover:bg-night-800 transition-loona"
+                  title="PDF herunterladen"
+                >
+                  <FileDown size={16} />
+                </a>
+                <button
+                  onClick={() => handleDelete(inv.id, inv.invoice_number)}
+                  className="p-2 rounded-lg text-night-400 hover:text-red-400 hover:bg-night-800 transition-loona"
+                  title="Rechnung löschen"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             </div>
           ))}
