@@ -78,8 +78,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "DEIN_GITHUB_USERNAME",
-      "repo": "loona"
+      "owner": "Mehtrick",
+      "repo": "loona-time-track"
     }
   }
 }

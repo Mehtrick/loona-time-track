@@ -5,8 +5,8 @@
 
   **Einfache Zeiterfassung für Freelancer.** Stunden buchen, Kunden und Tickets verwalten, PDF-Rechnungen erstellen – als native Desktop-App für Windows, macOS und Linux.
 
-  [![CI](https://github.com/DEIN_GITHUB_USERNAME/loona/actions/workflows/ci.yml/badge.svg)](https://github.com/DEIN_GITHUB_USERNAME/loona/actions/workflows/ci.yml)
-  [![Release](https://img.shields.io/github/v/release/DEIN_GITHUB_USERNAME/loona)](https://github.com/DEIN_GITHUB_USERNAME/loona/releases)
+  [![CI](https://github.com/Mehtrick/loona-time-track/actions/workflows/ci.yml/badge.svg)](https://github.com/Mehtrick/loona-time-track/actions/workflows/ci.yml)
+  [![Release](https://img.shields.io/github/v/release/Mehtrick/loona-time-track)](https://github.com/Mehtrick/loona-time-track/releases)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
@@ -52,7 +52,7 @@
 
 ## Download
 
-Lade die aktuelle Version für dein Betriebssystem von der [Releases-Seite](https://github.com/DEIN_GITHUB_USERNAME/loona/releases) herunter:
+Lade die aktuelle Version für dein Betriebssystem von der [Releases-Seite](https://github.com/Mehtrick/loona-time-track/releases) herunter:
 
 | Plattform | Datei |
 |-----------|-------|
@@ -82,7 +82,7 @@ Alle Daten werden ausschließlich lokal gespeichert – keine Cloud, kein Konto.
 ### Setup
 
 ```bash
-git clone https://github.com/DEIN_GITHUB_USERNAME/loona.git
+git clone https://github.com/Mehtrick/loona-time-track.git
 cd loona
 npm install
 ```
@@ -154,12 +154,12 @@ Passe den `build.publish`-Block in `package.json` an:
 ```json
 "publish": {
   "provider": "github",
-  "owner": "DEIN_GITHUB_USERNAME",
+  "owner": "Mehtrick",
   "repo": "loona"
 }
 ```
 
-Ersetze auch alle Vorkommen von `DEIN_GITHUB_USERNAME` in dieser README durch deinen tatsächlichen GitHub-Nutzernamen.
+Ersetze auch alle Vorkommen von `Mehtrick` in dieser README durch deinen tatsächlichen GitHub-Nutzernamen.
 
 ---
 
