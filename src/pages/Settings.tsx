@@ -8,7 +8,7 @@ const INPUT = "w-full bg-night-800 border border-night-600/50 rounded-xl px-4 py
 const INPUT_ERR = "w-full bg-night-800 border border-red-500/70 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-loona"
 const LABEL = "block text-sm font-medium text-night-200 mb-1.5"
 
-const KLEINUNTERNEHMER_TEXT = 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.'
+const KLEINUNTERNEHMER_TEXT = 'Abrechnung nach § 19 Abs. 1 UStG ohne Umsatzsteuer (Kleinunternehmerregelung)'
 
 function validateTaxNumber(val: string): boolean {
   if (!val) return true
@@ -129,11 +129,11 @@ export default function Settings() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className={LABEL}>Bank</label>
-              <input className={INPUT} value={s.bank_name || ''} onChange={e => set('bank_name', e.target.value)} placeholder="Volksbank" />
+              <input className={INPUT} value={s.bank_name || ''} onChange={e => set('bank_name', e.target.value)} placeholder="Meine Bank" />
             </div>
             <div>
               <label className={LABEL}>BIC</label>
-              <input className={INPUT} value={s.bank_bic || ''} onChange={e => set('bank_bic', e.target.value)} placeholder="DGPBDE3MXXX" />
+              <input className={INPUT} value={s.bank_bic || ''} onChange={e => set('bank_bic', e.target.value)} placeholder="BXXXXXXXX" />
             </div>
             <div>
               <label className={LABEL}>IBAN</label>
@@ -141,7 +141,7 @@ export default function Settings() {
                 className={ibanError ? INPUT_ERR : INPUT}
                 value={s.bank_iban || ''}
                 onChange={e => handleIbanChange(e.target.value)}
-                placeholder="DE12 3456 7890 1234 5678 90"
+                placeholder="DE00 0000 0000 0000 0000 00"
               />
               {ibanError && <p className="text-red-400 text-xs mt-1">{ibanError}</p>}
             </div>

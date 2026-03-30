@@ -303,13 +303,23 @@ export default function Entries() {
                     <td className="px-4 py-4 text-right">
                       <div className="flex items-center gap-1 justify-end">
                         {entry.billed ? (
-                          <button
-                            onClick={() => handleUnbill(entry)}
-                            className="px-2 py-1 rounded text-xs bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 transition-loona"
-                            title={`Abgerechnet: ${entry.billed}`}
-                          >
-                            ✓ {entry.billed.length > 20 ? entry.billed.slice(0, 20) + '...' : entry.billed}
-                          </button>
+                          <>
+                            <span
+                              className="px-2 py-1 rounded text-xs bg-emerald-900/30 text-emerald-400"
+                              title={`Abgerechnet: ${entry.billed}`}
+                            >
+                              ✓ {entry.billed.length > 20 ? entry.billed.slice(0, 20) + '...' : entry.billed}
+                            </span>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Abrechnung "${entry.billed}" wirklich entfernen?`)) handleUnbill(entry)
+                              }}
+                              className="p-1 rounded text-night-500 hover:text-red-400 hover:bg-night-800 transition-loona"
+                              title="Abrechnung entfernen"
+                            >
+                              <X size={12} />
+                            </button>
+                          </>
                         ) : billingEntry === entry.id ? (
                           <div className="flex items-center gap-1">
                             <input

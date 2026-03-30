@@ -705,11 +705,12 @@ export function createApp(dataFilePath) {
 
   // Maps a Planio time entry to Loona entry fields.
   // If comments contain "Abgerechnet" → billed field; otherwise → description field.
-  function mapEntryFields(te) {
+  // Falls back to issueTitle when comment is empty (and not "abgerechnet").
+  function mapEntryFields(te, issueTitle) {
     const comment = te.comments || '';
     const isAbgerechnet = /abgerechnet/i.test(comment);
     return {
-      description: isAbgerechnet ? (te.activity?.name || '') : (comment || te.activity?.name || ''),
+      description: isAbgerechnet ? (te.activity?.name || '') : (comment || issueTitle || te.activity?.name || ''),
       billed: isAbgerechnet ? comment : '',
     };
   }
@@ -842,7 +843,8 @@ export function createApp(dataFilePath) {
             ticketId = ticket.id;
           }
 
-          const { description, billed } = mapEntryFields(te);
+          const issueTitle = te.issue?.id ? (issues.find(i => i.id === te.issue.id)?.subject || null) : null;
+          const { description, billed } = mapEntryFields(te, issueTitle);
           const entry = {
             id: data.nextId.entries++,
             client_id: clientId,
