@@ -10,7 +10,8 @@
     "dev:client": "vite",
     "dev:server": "node server/index.js",
     "electron:dev": "concurrently \"npm run dev:client\" \"node --experimental-modules electron/wait-and-start.js\"",
-    "electron:build": "vite build && electron-builder",
+    "generate-icon": "node scripts/generate-icon.js",
+    "electron:build": "npm run generate-icon && vite build && electron-builder",
     "build": "vite build",
     "start": "node server/index.js",
     "test": "vitest run",
@@ -70,7 +71,7 @@
       "target": [
         { "target": "dmg", "arch": ["x64", "arm64"] }
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.icns"
     },
     "linux": {
       "target": "AppImage",
