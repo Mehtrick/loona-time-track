@@ -8,6 +8,8 @@ on:
 jobs:
   release:
     name: Build & Publish (${{ matrix.os }})
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
