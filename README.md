@@ -23,7 +23,7 @@
 - 🧾 **Abrechnungen** — Professionelle PDF-Rechnungen mit optionaler Obergrenze erstellen
 - 🔗 **Planio-Import** — Tickets und Buchungen aus Planio/Redmine importieren
 - ⚙️ **Einstellungen** — Geschäftsdaten, Bankverbindung, Stundensatz und Rechnungshinweis
-- 💾 **Lokale Datenhaltung** — Alle Daten als JSON-Datei, kein Cloud-Konto erforderlich
+- 💾 **Lokale Datenhaltung** — Alle Daten als verschlüsselte Datei (AES-256-GCM), kein Cloud-Konto erforderlich
 - 🖥️ **Plattformübergreifend** — Windows, macOS (Intel + Apple Silicon) und Linux
 
 ---
@@ -64,11 +64,35 @@ Lade die aktuelle Version für dein Betriebssystem von der [Releases-Seite](http
 
 ## Erster Start
 
-Beim ersten Start fragt Loona, wo deine Datendatei (`loona-data.json`) gespeichert werden soll. Der Standard ist das Benutzer-Datenverzeichnis. Den Pfad kannst du jederzeit über das Menü ändern:
+Beim ersten Start fragt Loona, wo deine Datendatei (`loona-data.json`) gespeichert werden soll. Der Standard ist das Benutzer-Datenverzeichnis (`%APPDATA%\loona\` auf Windows). Den Pfad kannst du jederzeit über das Menü ändern:
 
-> **Datei → Datenpfad ändern**
+> **Loona → Datenpfad ändern…**
+
+Den aktuell verwendeten Pfad siehst du unter **Loona → Aktuellen Datenpfad anzeigen**.
 
 Alle Daten werden ausschließlich lokal gespeichert – keine Cloud, kein Konto.
+
+---
+
+## Datensicherheit & Verschlüsselung
+
+Loona verschlüsselt die Datendatei automatisch mit **AES-256-GCM** (authentifizierte Verschlüsselung). Die Daten auf der Festplatte sind dadurch für Dritte ohne den passenden Schlüssel nicht lesbar.
+
+### Schlüsselverwaltung
+
+Der Verschlüsselungsschlüssel wird beim ersten Start zufällig generiert und sicher in der **OS-Keychain** abgelegt:
+
+| Plattform | Speicherort |
+|-----------|-------------|
+| **Windows** | Windows Credential Store (über Electron `safeStorage`) |
+| **macOS** | macOS Keychain (über Electron `safeStorage`) |
+| **Linux** | libsecret / GNOME Keyring – Fallback auf `loona.key` im App-Datenverzeichnis |
+
+> **Hinweis:** Bei einem Umzug auf einen anderen Rechner muss die Datendatei zusammen mit dem Schlüssel migriert werden. Ohne den passenden Schlüssel können die Daten nicht entschlüsselt werden. Erstelle daher regelmäßig Backups deines App-Datenverzeichnisses.
+
+### Migration bestehender (unverschlüsselter) Daten
+
+Wer von einer Loona-Version vor Einführung der Verschlüsselung aktualisiert, muss nichts tun. Loona erkennt beim Start automatisch unverschlüsselte Dateien und verschlüsselt sie sofort – die Daten bleiben vollständig erhalten.
 
 ---
 
