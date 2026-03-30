@@ -1,6 +1,47 @@
 import express from 'express';
 import cors from 'cors';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+
+// Datei-Header für verschlüsselte Daten
+const ENCRYPTION_HEADER = 'LOONA_ENC_V1:';
+
+/**
+ * Verschlüsselt einen JSON-String mit AES-256-GCM.
+ * @param {string} plaintext
+ * @param {Buffer} key - 32-Byte-Schlüssel
+ * @returns {string} Verschlüsselter String im Format LOONA_ENC_V1:<iv>:<authTag>:<ciphertext>
+ */
+export function encryptJson(plaintext, key) {
+  const iv = randomBytes(16);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(plaintext, 'utf-8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag().toString('hex');
+  return `${ENCRYPTION_HEADER}${iv.toString('hex')}:${authTag}:${encrypted}`;
+}
+
+/**
+ * Entschlüsselt einen mit encryptJson verschlüsselten String.
+ * @param {string} ciphertext
+ * @param {Buffer} key - 32-Byte-Schlüssel
+ * @returns {string} Entschlüsselter JSON-String
+ */
+export function decryptJson(ciphertext, key) {
+  const rest = ciphertext.slice(ENCRYPTION_HEADER.length);
+  const firstColon = rest.indexOf(':');
+  const secondColon = rest.indexOf(':', firstColon + 1);
+  const ivHex = rest.slice(0, firstColon);
+  const authTagHex = rest.slice(firstColon + 1, secondColon);
+  const encryptedHex = rest.slice(secondColon + 1);
+  const iv = Buffer.from(ivHex, 'hex');
+  const authTag = Buffer.from(authTagHex, 'hex');
+  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+  let decrypted = decipher.update(encryptedHex, 'hex', 'utf-8');
+  decrypted += decipher.final('utf-8');
+  return decrypted;
+}
 
 // Current schema version - increment when adding a new migration
 export const CURRENT_VERSION = 3;
@@ -58,7 +99,7 @@ export function migrateData(data) {
   return { data, migrated: true };
 }
 
-export function createApp(dataFilePath) {
+export function createApp(dataFilePath, encryptionKey = null) {
   const app = express();
   app.use(cors());
   app.use(express.json());
@@ -76,21 +117,34 @@ export function createApp(dataFilePath) {
     };
   }
 
+  function serializeData(data) {
+    const json = JSON.stringify(data, null, 2);
+    return encryptionKey ? encryptJson(json, encryptionKey) : json;
+  }
+
   function loadData() {
     if (!existsSync(dataFilePath)) {
       return emptyData();
     }
-    const raw = JSON.parse(readFileSync(dataFilePath, 'utf-8'));
-    const { data, migrated } = migrateData(raw);
-    if (migrated) {
-      writeFileSync(dataFilePath, JSON.stringify(data, null, 2), 'utf-8');
+    const raw = readFileSync(dataFilePath, 'utf-8');
+    const isEncrypted = raw.startsWith(ENCRYPTION_HEADER);
+    let parsed;
+    if (isEncrypted) {
+      parsed = JSON.parse(decryptJson(raw, encryptionKey));
+    } else {
+      parsed = JSON.parse(raw);
+    }
+    const { data, migrated } = migrateData(parsed);
+    // Speichern wenn: Schema migriert ODER Datei war unverschlüsselt aber Schlüssel ist gesetzt (Migration zu Verschlüsselung)
+    if (migrated || (encryptionKey && !isEncrypted)) {
+      writeFileSync(dataFilePath, serializeData(data), 'utf-8');
     }
     return data;
   }
 
   function saveData(data) {
     data.version = CURRENT_VERSION;
-    writeFileSync(dataFilePath, JSON.stringify(data, null, 2), 'utf-8');
+    writeFileSync(dataFilePath, serializeData(data), 'utf-8');
   }
 
   function now() {

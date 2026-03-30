@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
-import { writeFileSync, unlinkSync, existsSync } from 'fs';
+import { writeFileSync, unlinkSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -819,5 +819,86 @@ describe('Invoices API', () => {
     // Update
     const upd = await request(app).put('/api/clients/1').send({ name: 'Addr Client', address_line1: 'Neue Str. 5' });
     expect(upd.body.address_line1).toBe('Neue Str. 5');
+  });
+});
+
+// =====================
+// VERSCHLÜSSELUNG
+// =====================
+import { randomBytes } from 'crypto';
+import { encryptJson, decryptJson } from './app.js';
+
+const ENC_TEST_FILE = join(__dirname, '..', 'loona-test-enc.json');
+
+describe('Verschlüsselung (encryptJson / decryptJson)', () => {
+  it('verschlüsselt und entschlüsselt einen JSON-String korrekt', () => {
+    const key = randomBytes(32);
+    const original = JSON.stringify({ version: 3, clients: [{ id: 1, name: 'Test' }] });
+    const encrypted = encryptJson(original, key);
+    expect(encrypted.startsWith('LOONA_ENC_V1:')).toBe(true);
+    expect(encrypted).not.toContain('"Test"');
+    const decrypted = decryptJson(encrypted, key);
+    expect(decrypted).toBe(original);
+  });
+
+  it('schlägt fehl, wenn ein falscher Schlüssel verwendet wird', () => {
+    const key1 = randomBytes(32);
+    const key2 = randomBytes(32);
+    const encrypted = encryptJson('{"version":3}', key1);
+    expect(() => decryptJson(encrypted, key2)).toThrow();
+  });
+
+  it('jede Verschlüsselung erzeugt einen anderen Ciphertext (IV-Randomness)', () => {
+    const key = randomBytes(32);
+    const plaintext = '{"version":3}';
+    const enc1 = encryptJson(plaintext, key);
+    const enc2 = encryptJson(plaintext, key);
+    expect(enc1).not.toBe(enc2);
+  });
+});
+
+describe('Datei-Verschlüsselung (createApp mit encryptionKey)', () => {
+  const encKey = randomBytes(32);
+
+  beforeEach(() => {
+    if (existsSync(ENC_TEST_FILE)) unlinkSync(ENC_TEST_FILE);
+  });
+
+  afterAll(() => {
+    if (existsSync(ENC_TEST_FILE)) unlinkSync(ENC_TEST_FILE);
+  });
+
+  it('speichert Daten verschlüsselt auf Platte', async () => {
+    const encApp = createApp(ENC_TEST_FILE, encKey);
+    await request(encApp).post('/api/clients').send({ name: 'Geheim GmbH' });
+    const raw = readFileSync(ENC_TEST_FILE, 'utf-8');
+    expect(raw.startsWith('LOONA_ENC_V1:')).toBe(true);
+    expect(raw).not.toContain('Geheim GmbH');
+  });
+
+  it('liest verschlüsselte Daten korrekt zurück', async () => {
+    const encApp = createApp(ENC_TEST_FILE, encKey);
+    await request(encApp).post('/api/clients').send({ name: 'Geheim GmbH' });
+    // Neue App-Instanz mit demselben Schlüssel – muss Daten lesen können
+    const encApp2 = createApp(ENC_TEST_FILE, encKey);
+    const res = await request(encApp2).get('/api/clients');
+    expect(res.status).toBe(200);
+    expect(res.body[0].name).toBe('Geheim GmbH');
+  });
+
+  it('migriert eine bestehende unverschlüsselte JSON-Datei automatisch', async () => {
+    // Unverschlüsselte Ausgangsdaten schreiben (wie vor der Verschlüsselungs-Migration)
+    const plainData = { version: 3, settings: {}, clients: [{ id: 1, name: 'Alt GmbH', color: '#aaa', created_at: '2024-01-01' }], tickets: [], entries: [], invoices: [], lastInvoiceNumber: '', nextId: { clients: 2, tickets: 1, entries: 1, invoices: 1 } };
+    writeFileSync(ENC_TEST_FILE, JSON.stringify(plainData, null, 2), 'utf-8');
+
+    // App mit Schlüssel starten – muss Klartext lesen und verschlüsselt speichern
+    const encApp = createApp(ENC_TEST_FILE, encKey);
+    const res = await request(encApp).get('/api/clients');
+    expect(res.status).toBe(200);
+    expect(res.body[0].name).toBe('Alt GmbH');
+
+    // Datei muss jetzt verschlüsselt sein
+    const raw = readFileSync(ENC_TEST_FILE, 'utf-8');
+    expect(raw.startsWith('LOONA_ENC_V1:')).toBe(true);
   });
 });

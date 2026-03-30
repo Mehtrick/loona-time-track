@@ -1,9 +1,10 @@
-import { app, BrowserWindow, dialog, Menu, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, Menu, ipcMain, safeStorage } from 'electron';
 import { createApp } from '../server/app.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import express from 'express';
+import { randomBytes } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -31,6 +32,43 @@ function saveSettings(settings) {
 let mainWindow = null;
 let server = null;
 let serverPort = null;
+let encryptionKey = null;
+
+/**
+ * Lädt den Verschlüsselungsschlüssel aus den Settings (via safeStorage / OS-Keychain)
+ * oder aus einer Fallback-Schlüsseldatei. Generiert einen neuen Schlüssel beim ersten Start.
+ * settings wird ggf. mit dem neuen Key-Eintrag befüllt (Aufrufer muss dann saveSettings aufrufen).
+ */
+function loadOrCreateEncryptionKey(settings) {
+  const keyFilePath = join(app.getPath('userData'), 'loona.key');
+
+  if (safeStorage.isEncryptionAvailable()) {
+    if (settings.encryptionKey) {
+      try {
+        const encryptedBuf = Buffer.from(settings.encryptionKey, 'base64');
+        const keyHex = safeStorage.decryptString(encryptedBuf);
+        return Buffer.from(keyHex, 'hex');
+      } catch {
+        // Schlüssel beschädigt oder anderer Rechner — neuen generieren
+      }
+    }
+    const key = randomBytes(32);
+    settings.encryptionKey = safeStorage.encryptString(key.toString('hex')).toString('base64');
+    return key;
+  }
+
+  // Fallback: Schlüsseldatei (falls safeStorage nicht verfügbar, z. B. auf manchen Linux-Systemen)
+  if (existsSync(keyFilePath)) {
+    try {
+      return Buffer.from(readFileSync(keyFilePath, 'utf-8').trim(), 'hex');
+    } catch {
+      // Beschädigte Datei — neuen Schlüssel generieren
+    }
+  }
+  const key = randomBytes(32);
+  writeFileSync(keyFilePath, key.toString('hex'), 'utf-8');
+  return key;
+}
 
 function getDefaultDataPath() {
   return join(app.getPath('userData'), 'loona-data.json');
@@ -78,7 +116,7 @@ function startServer(dataPath) {
     server.close();
   }
 
-  const expressApp = createApp(dataPath);
+  const expressApp = createApp(dataPath, encryptionKey);
 
   // Serve built frontend in production
   if (!isDev) {
@@ -218,6 +256,11 @@ function buildMenu() {
 
 app.whenReady().then(async () => {
   const settings = loadSettings();
+
+  // Verschlüsselungsschlüssel laden oder neu generieren (vor dem ersten Server-Start)
+  encryptionKey = loadOrCreateEncryptionKey(settings);
+  saveSettings(settings);
+
   let dataPath = settings.dataPath;
 
   // First start: show welcome dialog then ask for data path
