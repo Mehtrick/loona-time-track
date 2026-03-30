@@ -39,20 +39,6 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           npm version "$VERSION" --no-git-tag-version --allow-same-version
 
-      - name: Set publish owner/repo
-        shell: bash
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.build.publish.owner = process.env.OWNER;
-            pkg.build.publish.repo = process.env.REPO;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-          "
-        env:
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
-
       - name: Install Linux build dependencies
         if: matrix.os == 'ubuntu-latest'
         run: |

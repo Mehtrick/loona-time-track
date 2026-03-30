@@ -2,6 +2,7 @@
   "name": "loona",
   "version": "1.0.0",
   "description": "Loona - Zeiterfassung für Freelancer",
+  "author": "Mehtrick",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -79,7 +80,8 @@
     "publish": {
       "provider": "github",
       "owner": "Mehtrick",
-      "repo": "loona-time-track"
+      "repo": "loona-time-track",
+      "releaseType": "release"
     }
   }
 }
