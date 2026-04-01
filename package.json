@@ -65,7 +65,8 @@
       "allowToChangeInstallationDirectory": true,
       "installerLanguages": [
         "de"
-      ]
+      ],
+      "include": "build/installer.nsh"
     },
     "mac": {
       "target": [
