@@ -870,6 +870,26 @@ describe('Passwortbasierte Datei-Verschlüsselung', () => {
     expect(clientsRes.status).toBe(503);
   });
 
+  it('nicht-API-Routen werden bei gesperrter App nicht blockiert (Regression: lock-guard darf nur /api betreffen)', async () => {
+    const encApp = createApp(ENC_TEST_FILE);
+    await request(encApp).post('/api/clients').send({ name: 'Test GmbH' });
+    await request(encApp).post('/api/encryption').send({ password: 'sicheresPasswort123' });
+
+    const lockedApp = createApp(ENC_TEST_FILE);
+
+    // /api/* muss gesperrt sein
+    const apiRes = await request(lockedApp).get('/api/clients');
+    expect(apiRes.status).toBe(503);
+
+    // Nicht-API-Routen dürfen nie 503 zurückgeben – der React-Build muss ladbar bleiben.
+    // Im Test-Environment gibt es kein dist/-Verzeichnis, daher 404 statt 200, aber nie 503.
+    const rootRes = await request(lockedApp).get('/');
+    expect(rootRes.status).not.toBe(503);
+
+    const assetRes = await request(lockedApp).get('/assets/index.js');
+    expect(assetRes.status).not.toBe(503);
+  });
+
   it('entsperrt mit korrektem Passwort und verweigert mit falschem', async () => {
     const encApp = createApp(ENC_TEST_FILE);
     await request(encApp).post('/api/clients').send({ name: 'Test GmbH' });
