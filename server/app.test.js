@@ -884,10 +884,12 @@ describe('Passwortbasierte Datei-Verschlüsselung', () => {
     // Nicht-API-Routen dürfen nie 503 zurückgeben – der React-Build muss ladbar bleiben.
     // Im Test-Environment gibt es kein dist/-Verzeichnis, daher 404 statt 200, aber nie 503.
     const rootRes = await request(lockedApp).get('/');
-    expect(rootRes.status).not.toBe(503);
+    expect(rootRes.status).toBe(404);
+    expect(rootRes.text).not.toContain('locked');
 
     const assetRes = await request(lockedApp).get('/assets/index.js');
-    expect(assetRes.status).not.toBe(503);
+    expect(assetRes.status).toBe(404);
+    expect(assetRes.text).not.toContain('locked');
   });
 
   it('entsperrt mit korrektem Passwort und verweigert mit falschem', async () => {
