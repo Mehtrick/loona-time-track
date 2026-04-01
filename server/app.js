@@ -470,9 +470,10 @@ export function createApp(dataFilePath) {
 
   function suggestNextInvoiceNumber(lastNumber) {
     const year = new Date().getFullYear().toString();
+    const last = lastNumber != null ? String(lastNumber) : '';
 
     // Format: YYYY-NNNNN (e.g. "2026-00001" → "2026-00002")
-    const dashMatch = lastNumber && lastNumber.match(/^(\d{4})-(\d+)$/);
+    const dashMatch = last && last.match(/^(\d{4})-(\d+)$/);
     if (dashMatch) {
       const [, lastYear, numStr] = dashMatch;
       const padLen = numStr.length;
@@ -484,14 +485,14 @@ export function createApp(dataFilePath) {
     }
 
     // Format: YYYYnnnnnn (e.g. "2026000001" → "2026000002")
-    if (lastNumber && lastNumber.startsWith(year)) {
-      const num = parseInt(lastNumber.slice(4), 10);
+    if (last && last.startsWith(year)) {
+      const num = parseInt(last.slice(4), 10);
       return year + String(num + 1).padStart(6, '0');
     }
 
     // Plain integer (e.g. "42" → "43")
-    if (lastNumber && /^\d+$/.test(lastNumber)) {
-      return String(parseInt(lastNumber, 10) + 1);
+    if (last && /^\d+$/.test(last)) {
+      return String(parseInt(last, 10) + 1);
     }
 
     return year + '000001';
