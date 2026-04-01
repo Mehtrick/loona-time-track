@@ -209,8 +209,8 @@ export function createApp(dataFilePath) {
     }
   });
 
-  // === LOCK-GUARD: alle folgenden Routen sind nur im entsperrten Zustand erreichbar ===
-  app.use((req, res, next) => {
+  // === LOCK-GUARD: nur API-Routen sperren, statische Dateien immer erlauben ===
+  app.use('/api', (req, res, next) => {
     if (locked) return res.status(503).json({ error: 'locked' });
     next();
   });

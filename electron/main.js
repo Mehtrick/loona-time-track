@@ -340,7 +340,7 @@ async function setupAutoUpdater() {
     console.error('Update-Fehler:', err);
   });
 
-  autoUpdater.checkForUpdatesAndNotify();
+  autoUpdater.checkForUpdates();
 }
 
 app.on('activate', () => {
