@@ -470,13 +470,30 @@ export function createApp(dataFilePath) {
 
   function suggestNextInvoiceNumber(lastNumber) {
     const year = new Date().getFullYear().toString();
+
+    // Format: YYYY-NNNNN (e.g. "2026-00001" → "2026-00002")
+    const dashMatch = lastNumber && lastNumber.match(/^(\d{4})-(\d+)$/);
+    if (dashMatch) {
+      const [, lastYear, numStr] = dashMatch;
+      const padLen = numStr.length;
+      if (lastYear === year) {
+        return year + '-' + String(parseInt(numStr, 10) + 1).padStart(padLen, '0');
+      }
+      // New year: reset counter, preserve padding length
+      return year + '-' + '1'.padStart(padLen, '0');
+    }
+
+    // Format: YYYYnnnnnn (e.g. "2026000001" → "2026000002")
     if (lastNumber && lastNumber.startsWith(year)) {
       const num = parseInt(lastNumber.slice(4), 10);
       return year + String(num + 1).padStart(6, '0');
     }
+
+    // Plain integer (e.g. "42" → "43")
     if (lastNumber && /^\d+$/.test(lastNumber)) {
       return String(parseInt(lastNumber, 10) + 1);
     }
+
     return year + '000001';
   }
 
