@@ -749,14 +749,15 @@ describe('Invoices API', () => {
   });
 
   it('GET /api/invoices/next-number erkennt YYYY-NNNNN Format (mit Bindestrich)', async () => {
+    const year = new Date().getFullYear().toString();
     await request(app).post('/api/clients').send({ name: 'C' });
-    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 1 });
+    await request(app).post('/api/entries').send({ client_id: 1, date: `${year}-01-01`, hours: 1 });
     await request(app).post('/api/invoices').send({
-      client_id: 1, invoice_number: '2026-00001', date: '2026-01-15', due_date: '2026-01-29', hourly_rate: 80, entry_ids: [1],
+      client_id: 1, invoice_number: `${year}-00001`, date: `${year}-01-15`, due_date: `${year}-01-29`, hourly_rate: 80, entry_ids: [1],
     });
 
     const res = await request(app).get('/api/invoices/next-number');
-    expect(res.body.next).toBe('2026-00002');
+    expect(res.body.next).toBe(`${year}-00002`);
   });
 
   it('GET /api/invoices/next-number setzt Zähler bei neuem Jahr zurück (YYYY-NNNNN Format)', async () => {
