@@ -748,6 +748,40 @@ describe('Invoices API', () => {
     expect(res.body.next).toBe('2026000006');
   });
 
+  it('GET /api/invoices/next-number erkennt YYYY-NNNNN Format (mit Bindestrich)', async () => {
+    await request(app).post('/api/clients').send({ name: 'C' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 1 });
+    await request(app).post('/api/invoices').send({
+      client_id: 1, invoice_number: '2026-00001', date: '2026-01-15', due_date: '2026-01-29', hourly_rate: 80, entry_ids: [1],
+    });
+
+    const res = await request(app).get('/api/invoices/next-number');
+    expect(res.body.next).toBe('2026-00002');
+  });
+
+  it('GET /api/invoices/next-number setzt Zähler bei neuem Jahr zurück (YYYY-NNNNN Format)', async () => {
+    await request(app).post('/api/clients').send({ name: 'C' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 1 });
+    await request(app).post('/api/invoices').send({
+      client_id: 1, invoice_number: '2025-00042', date: '2026-01-15', due_date: '2026-01-29', hourly_rate: 80, entry_ids: [1],
+    });
+
+    const res = await request(app).get('/api/invoices/next-number');
+    const year = new Date().getFullYear().toString();
+    expect(res.body.next).toBe(year + '-00001');
+  });
+
+  it('YYYY-NNNNN Rechnungsnummer wird korrekt gespeichert und als billed gesetzt', async () => {
+    await request(app).post('/api/clients').send({ name: 'C' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 2 });
+    await request(app).post('/api/invoices').send({
+      client_id: 1, invoice_number: '2026-00003', date: '2026-01-15', hourly_rate: 80, entry_ids: [1],
+    });
+
+    const entries = await request(app).get('/api/entries?show_billed=1');
+    expect(entries.body[0].billed).toBe('2026-00003');
+  });
+
   it('GET /api/invoices/:id returns single invoice', async () => {
     await request(app).post('/api/clients').send({ name: 'C' });
     await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 1 });
