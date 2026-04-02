@@ -502,6 +502,66 @@ export function createApp(dataFilePath) {
     res.json({ next: suggestNextInvoiceNumber(data.lastInvoiceNumber) });
   });
 
+  app.get('/api/invoices/download-all', async (req, res) => {
+    const data = loadData();
+    if (!data.invoices.length) {
+      return res.status(404).json({ error: 'Keine Rechnungen vorhanden' });
+    }
+
+    let archiver;
+    try {
+      archiver = (await import('archiver')).default;
+    } catch {
+      return res.status(500).json({ error: 'ZIP-Bibliothek nicht verfuegbar' });
+    }
+
+    const s = data.settings || {};
+    const archive = archiver('zip', { zlib: { level: 6 } });
+
+    // Client-Map für O(1)-Nachschlag statt O(n*m)
+    const clientMap = new Map(data.clients.map(c => [c.id, c]));
+
+    let zipFehler = null;
+    const handleZipError = err => {
+      if (zipFehler) return;
+      zipFehler = err;
+      console.error('ZIP-Fehler:', err);
+      try { archive.abort(); } catch { /* ignore */ }
+      if (!res.headersSent) return res.status(500).json({ error: 'ZIP-Download fehlgeschlagen' });
+      if (!res.destroyed) res.destroy(err);
+    };
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': 'attachment; filename="Rechnungen.zip"',
+    });
+
+    archive.on('error', handleZipError);
+    archive.pipe(res);
+
+    for (const invoice of data.invoices) {
+      if (zipFehler || res.destroyed) break;
+      const client = clientMap.get(invoice.client_id);
+      // Zip-Slip-Schutz: nur alphanumerische Zeichen, Bindestrich und Unterstrich erlaubt
+      const safeName = String(invoice.invoice_number).replace(/[^a-zA-Z0-9\-_]/g, '_');
+      try {
+        const pdf = await buildInvoicePdf(invoice, client, s);
+        if (zipFehler || res.destroyed) break;
+        archive.append(pdf, { name: `Rechnung_${safeName}.pdf` });
+      } catch (err) {
+        handleZipError(err);
+        break;
+      }
+    }
+
+    if (zipFehler || res.destroyed) return;
+    try {
+      await archive.finalize();
+    } catch (err) {
+      handleZipError(err);
+    }
+  });
+
   app.get('/api/invoices', (req, res) => {
     const data = loadData();
     const invoices = data.invoices.map(inv => {
@@ -515,7 +575,7 @@ export function createApp(dataFilePath) {
   app.get('/api/invoices/:id', (req, res) => {
     const data = loadData();
     const invoice = data.invoices.find(i => i.id === Number(req.params.id));
-    if (!invoice) return res.status(404).json({ error: 'Not found' });
+    if (!invoice) return res.status(404).json({ error: 'Rechnung nicht gefunden' });
     const client = data.clients.find(c => c.id === invoice.client_id);
     res.json({ ...invoice, client_name: client?.name || '', client_color: client?.color || '#666' });
   });
@@ -620,184 +680,22 @@ export function createApp(dataFilePath) {
   app.get('/api/invoices/:id/pdf', async (req, res) => {
     const data = loadData();
     const invoice = data.invoices.find(i => i.id === Number(req.params.id));
-    if (!invoice) return res.status(404).json({ error: 'Not found' });
-
+    if (!invoice) return res.status(404).json({ error: 'Rechnung nicht gefunden' });
     const client = data.clients.find(c => c.id === invoice.client_id);
     const s = data.settings || {};
-
-    let PDFDocument;
     try {
-      PDFDocument = (await import('pdfkit')).default;
-    } catch {
-      return res.status(500).json({ error: 'PDF-Bibliothek nicht verfuegbar' });
-    }
-
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
-
-    // Register Unicode-capable font for German umlauts
-    const unicodeFont = findUnicodeFont();
-    if (unicodeFont) {
-      doc.registerFont('Main', unicodeFont);
-      doc.registerFont('Main-Bold', unicodeFont); // will use same as fallback
-      // Try bold variant
-      const boldVariant = unicodeFont
-        .replace('calibri.ttf', 'calibrib.ttf')
-        .replace('arial.ttf', 'arialbd.ttf')
-        .replace('segoeui.ttf', 'segoeuib.ttf')
-        .replace('LiberationSans-Regular.ttf', 'LiberationSans-Bold.ttf')
-        .replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')
-        .replace('FreeSans.ttf', 'FreeSansBold.ttf');
-      try { if (existsSync(boldVariant)) doc.registerFont('Main-Bold', boldVariant); } catch { /* skip */ }
-    }
-
-    const F = unicodeFont ? 'Main' : 'Helvetica';
-    const FB = unicodeFont ? 'Main-Bold' : 'Helvetica-Bold';
-    const buffers = [];
-    doc.on('data', chunk => buffers.push(chunk));
-    doc.on('end', () => {
-      const pdf = Buffer.concat(buffers);
+      const pdf = await buildInvoicePdf(invoice, client, s);
+      // Zip-Slip-Schutz: nur sichere Zeichen im Dateinamen
+      const safeName = String(invoice.invoice_number).replace(/[^a-zA-Z0-9\-_]/g, '_');
       res.set({
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="Rechnung_${invoice.invoice_number}.pdf"`,
+        'Content-Disposition': `inline; filename="Rechnung_${safeName}.pdf"`,
         'Content-Length': pdf.length,
       });
       res.send(pdf);
-    });
-
-    const pageW = 595.28;
-    const rightM = 50;
-    const leftM = 50;
-    const lineH = 15;
-    const senderW = 225;
-    const rightCol = pageW - rightM - senderW; // flush to right margin
-    let y;
-
-    // --- Sender block (top right, right-aligned text) ---
-    y = 50;
-    doc.fontSize(10).font(F);
-    const ro = { width: senderW, align: 'right' };
-    if (s.company_name) { doc.text(s.company_name, rightCol, y, ro); y += lineH; }
-    if (s.address_line1) { doc.text(s.address_line1, rightCol, y, ro); y += lineH; }
-    if (s.address_line2) { doc.text(s.address_line2, rightCol, y, ro); y += lineH; }
-    if (s.phone) { doc.text(`Tel: ${s.phone}`, rightCol, y, ro); y += lineH; }
-    if (s.email) { doc.text(`E-Mail: ${s.email}`, rightCol, y, ro); y += lineH; }
-    y += lineH;
-    if (s.tax_number) { doc.text(`Steuernummer: ${s.tax_number}`, rightCol, y, ro); y += lineH; }
-    y += lineH;
-    doc.text(`Rechnungs-Nr: ${invoice.invoice_number}`, rightCol, y, ro); y += lineH;
-    doc.text(`Rechnungsdatum: ${formatDateDE(invoice.date)}`, rightCol, y, ro); y += lineH;
-    if (invoice.due_date) { doc.text(`Fälligkeitsdatum: ${formatDateDE(invoice.due_date)}`, rightCol, y, ro); y += lineH; }
-
-    // --- Recipient block (left) ---
-    let ry = 130;
-    doc.fontSize(10).font(F);
-    doc.text('An', leftM, ry); ry += lineH;
-    doc.font(FB).text(client?.name || '', leftM, ry, { width: 250 }); ry += lineH;
-    doc.font(F);
-    if (client?.address_line1) { doc.text(client.address_line1, leftM, ry, { width: 250 }); ry += lineH; }
-    if (client?.address_line2 && client.address_line2 !== client.address_line1) {
-      doc.text(client.address_line2, leftM, ry, { width: 250 }); ry += lineH;
+    } catch {
+      res.status(500).json({ error: 'PDF-Generierung fehlgeschlagen' });
     }
-
-    // --- Heading ---
-    const headY = Math.max(y, ry) + 30;
-    doc.fontSize(22).font(F).text('Rechnung', leftM, headY);
-
-    // --- Intro ---
-    let introY = headY + 40;
-    doc.fontSize(10).font(F);
-    doc.text('Sehr geehrte Damen und Herren,', leftM, introY, { width: 495 }); introY += lineH * 2;
-    doc.text('ich erlaube mir, Ihnen folgende Positionen zu berechnen.', leftM, introY, { width: 495 }); introY += lineH * 2;
-
-    // --- Table ---
-    // Column left edges (all within leftM … pageW-rightM = 50…545)
-    const cols = { pos: leftM, desc: leftM + 42, qty: 308, unit: 358, price: 415, total: 472 };
-    const tableRight = pageW - rightM; // 545.28
-    const tableW = tableRight - leftM;
-    // Column widths derived from edges
-    const colW = {
-      pos:   cols.desc  - cols.pos,            // 42
-      desc:  cols.qty   - cols.desc,            // 266
-      qty:   cols.unit  - cols.qty,             // 50
-      unit:  cols.price - cols.unit,            // 57
-      price: cols.total - cols.price,           // 57
-      total: tableRight - cols.total,           // 73
-    };
-
-    // Helper: draw vertical dividers for a row at (rowY, rowH)
-    function drawRowDividers(rowY, rowH) {
-      doc.save().strokeColor('#cccccc').lineWidth(0.5);
-      [cols.desc, cols.qty, cols.unit, cols.price, cols.total].forEach(x => {
-        doc.moveTo(x, rowY).lineTo(x, rowY + rowH).stroke();
-      });
-      doc.restore();
-    }
-
-    let ty = introY + 10;
-    const rowPadX = 4; // inner horizontal padding
-
-    // Header row
-    const headerH = 18;
-    doc.font(FB).fontSize(9);
-    doc.rect(leftM, ty - 3, tableW, headerH).fillAndStroke('#f0f0f0', '#999999');
-    doc.fillColor('#000000');
-    doc.text('Pos.',      cols.pos   + rowPadX, ty, { width: colW.pos   - rowPadX, align: 'left' });
-    doc.text('Bezeichnung', cols.desc + rowPadX, ty, { width: colW.desc  - rowPadX, align: 'left' });
-    doc.text('Menge',     cols.qty   + rowPadX, ty, { width: colW.qty   - rowPadX * 2, align: 'center' });
-    doc.text('Einheit',   cols.unit  + rowPadX, ty, { width: colW.unit  - rowPadX, align: 'left' });
-    doc.text('Einzelpreis', cols.price + rowPadX, ty, { width: colW.price - rowPadX, align: 'right' });
-    doc.text('Gesamt',    cols.total + rowPadX, ty, { width: colW.total - rowPadX, align: 'right' });
-    drawRowDividers(ty - 3, headerH);
-    ty += headerH + 2;
-
-    // Data rows
-    doc.font(F).fontSize(9);
-    invoice.items.forEach((item, idx) => {
-      const descH = doc.heightOfString(item.description, { width: colW.desc - rowPadX });
-      const rowH = Math.max(descH + 6, 18);
-
-      if (ty + rowH > 760) { doc.addPage(); ty = 50; }
-
-      const rowBg = idx % 2 === 1 ? '#f9f9f9' : '#ffffff';
-      doc.rect(leftM, ty - 3, tableW, rowH).fillAndStroke(rowBg, '#999999');
-      doc.fillColor('#000000');
-      doc.text(String(idx + 1),                    cols.pos   + rowPadX, ty, { width: colW.pos   - rowPadX, align: 'left' });
-      doc.text(item.description,                   cols.desc  + rowPadX, ty, { width: colW.desc  - rowPadX, align: 'left' });
-      doc.text(String(item.hours).replace('.', ','), cols.qty  + rowPadX, ty, { width: colW.qty   - rowPadX * 2, align: 'center' });
-      doc.text('Stunden',                          cols.unit  + rowPadX, ty, { width: colW.unit  - rowPadX, align: 'left' });
-      doc.text(fmtEur(item.rate),                  cols.price + rowPadX, ty, { width: colW.price - rowPadX, align: 'right' });
-      doc.text(fmtEur(item.amount),                cols.total + rowPadX, ty, { width: colW.total - rowPadX, align: 'right' });
-      drawRowDividers(ty - 3, rowH);
-      ty += rowH;
-    });
-
-    // Summe row
-    doc.font(FB).fontSize(9);
-    const sumH = 20;
-    doc.rect(leftM, ty - 3, tableW, sumH).fillAndStroke('#e8e8e8', '#999999');
-    doc.fillColor('#000000');
-    doc.text('Summe', cols.pos + rowPadX, ty, { width: colW.pos + colW.desc + colW.qty + colW.unit + colW.price - rowPadX });
-    doc.text(fmtEur(invoice.total), cols.total + rowPadX, ty, { width: colW.total - rowPadX, align: 'right' });
-    drawRowDividers(ty - 3, sumH);
-    ty += sumH + 20;
-
-    // Note
-    doc.font(F).fontSize(9);
-    const note = s.invoice_note || '';
-    if (note) {
-      doc.text(`Hinweis: ${note}`, leftM, ty, { width: 495 });
-    }
-
-    // Footer — bank details at page bottom (disable bottom margin to prevent auto-pagination)
-    const bankLine = [s.bank_name, s.bank_bic ? `BIC ${s.bank_bic}` : '', s.bank_iban ? `IBAN ${s.bank_iban}` : ''].filter(Boolean).join(' | ');
-    if (bankLine) {
-      const savedBottom = doc.page.margins.bottom;
-      doc.page.margins.bottom = 0;
-      doc.fontSize(8).text(`Bankverbindung: ${bankLine}`, leftM, doc.page.height - 30, { width: 495, align: 'center' });
-      doc.page.margins.bottom = savedBottom;
-    }
-
-    doc.end();
   });
 
   function formatDateDE(iso) {
@@ -808,6 +706,169 @@ export function createApp(dataFilePath) {
 
   function fmtEur(num) {
     return num.toFixed(2).replace('.', ',') + ' EUR';
+  }
+
+  async function buildInvoicePdf(invoice, client, s) {
+    let PDFDocument;
+    try {
+      PDFDocument = (await import('pdfkit')).default;
+    } catch {
+      throw new Error('PDF-Bibliothek (pdfkit) nicht verfügbar');
+    }
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+      // Register Unicode-capable font for German umlauts
+      const unicodeFont = findUnicodeFont();
+      if (unicodeFont) {
+        doc.registerFont('Main', unicodeFont);
+        doc.registerFont('Main-Bold', unicodeFont);
+        const boldVariant = unicodeFont
+          .replace('calibri.ttf', 'calibrib.ttf')
+          .replace('arial.ttf', 'arialbd.ttf')
+          .replace('segoeui.ttf', 'segoeuib.ttf')
+          .replace('LiberationSans-Regular.ttf', 'LiberationSans-Bold.ttf')
+          .replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf')
+          .replace('FreeSans.ttf', 'FreeSansBold.ttf');
+        try { if (existsSync(boldVariant)) doc.registerFont('Main-Bold', boldVariant); } catch { /* skip */ }
+      }
+
+      const F = unicodeFont ? 'Main' : 'Helvetica';
+      const FB = unicodeFont ? 'Main-Bold' : 'Helvetica-Bold';
+      const buffers = [];
+      doc.on('data', chunk => buffers.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+
+      const pageW = 595.28;
+      const rightM = 50;
+      const leftM = 50;
+      const lineH = 15;
+      const senderW = 225;
+      const rightCol = pageW - rightM - senderW;
+      let y;
+
+      // --- Sender block (top right, right-aligned text) ---
+      y = 50;
+      doc.fontSize(10).font(F);
+      const ro = { width: senderW, align: 'right' };
+      if (s.company_name) { doc.text(s.company_name, rightCol, y, ro); y += lineH; }
+      if (s.address_line1) { doc.text(s.address_line1, rightCol, y, ro); y += lineH; }
+      if (s.address_line2) { doc.text(s.address_line2, rightCol, y, ro); y += lineH; }
+      if (s.phone) { doc.text(`Tel: ${s.phone}`, rightCol, y, ro); y += lineH; }
+      if (s.email) { doc.text(`E-Mail: ${s.email}`, rightCol, y, ro); y += lineH; }
+      y += lineH;
+      if (s.tax_number) { doc.text(`Steuernummer: ${s.tax_number}`, rightCol, y, ro); y += lineH; }
+      y += lineH;
+      doc.text(`Rechnungs-Nr: ${invoice.invoice_number}`, rightCol, y, ro); y += lineH;
+      doc.text(`Rechnungsdatum: ${formatDateDE(invoice.date)}`, rightCol, y, ro); y += lineH;
+      if (invoice.due_date) { doc.text(`Fälligkeitsdatum: ${formatDateDE(invoice.due_date)}`, rightCol, y, ro); y += lineH; }
+
+      // --- Recipient block (left) ---
+      let ry = 130;
+      doc.fontSize(10).font(F);
+      doc.text('An', leftM, ry); ry += lineH;
+      doc.font(FB).text(client?.name || '', leftM, ry, { width: 250 }); ry += lineH;
+      doc.font(F);
+      if (client?.address_line1) { doc.text(client.address_line1, leftM, ry, { width: 250 }); ry += lineH; }
+      if (client?.address_line2 && client.address_line2 !== client.address_line1) {
+        doc.text(client.address_line2, leftM, ry, { width: 250 }); ry += lineH;
+      }
+
+      // --- Heading ---
+      const headY = Math.max(y, ry) + 30;
+      doc.fontSize(22).font(F).text('Rechnung', leftM, headY);
+
+      // --- Intro ---
+      let introY = headY + 40;
+      doc.fontSize(10).font(F);
+      doc.text('Sehr geehrte Damen und Herren,', leftM, introY, { width: 495 }); introY += lineH * 2;
+      doc.text('ich erlaube mir, Ihnen folgende Positionen zu berechnen.', leftM, introY, { width: 495 }); introY += lineH * 2;
+
+      // --- Table ---
+      const cols = { pos: leftM, desc: leftM + 42, qty: 308, unit: 358, price: 415, total: 472 };
+      const tableRight = pageW - rightM;
+      const tableW = tableRight - leftM;
+      const colW = {
+        pos:   cols.desc  - cols.pos,
+        desc:  cols.qty   - cols.desc,
+        qty:   cols.unit  - cols.qty,
+        unit:  cols.price - cols.unit,
+        price: cols.total - cols.price,
+        total: tableRight - cols.total,
+      };
+
+      function drawRowDividers(rowY, rowH) {
+        doc.save().strokeColor('#cccccc').lineWidth(0.5);
+        [cols.desc, cols.qty, cols.unit, cols.price, cols.total].forEach(x => {
+          doc.moveTo(x, rowY).lineTo(x, rowY + rowH).stroke();
+        });
+        doc.restore();
+      }
+
+      let ty = introY + 10;
+      const rowPadX = 4;
+
+      // Header row
+      const headerH = 18;
+      doc.font(FB).fontSize(9);
+      doc.rect(leftM, ty - 3, tableW, headerH).fillAndStroke('#f0f0f0', '#999999');
+      doc.fillColor('#000000');
+      doc.text('Pos.',        cols.pos   + rowPadX, ty, { width: colW.pos   - rowPadX, align: 'left' });
+      doc.text('Bezeichnung', cols.desc  + rowPadX, ty, { width: colW.desc  - rowPadX, align: 'left' });
+      doc.text('Menge',       cols.qty   + rowPadX, ty, { width: colW.qty   - rowPadX * 2, align: 'center' });
+      doc.text('Einheit',     cols.unit  + rowPadX, ty, { width: colW.unit  - rowPadX, align: 'left' });
+      doc.text('Einzelpreis', cols.price + rowPadX, ty, { width: colW.price - rowPadX, align: 'right' });
+      doc.text('Gesamt',      cols.total + rowPadX, ty, { width: colW.total - rowPadX, align: 'right' });
+      drawRowDividers(ty - 3, headerH);
+      ty += headerH + 2;
+
+      // Data rows
+      doc.font(F).fontSize(9);
+      invoice.items.forEach((item, idx) => {
+        const descH = doc.heightOfString(item.description, { width: colW.desc - rowPadX });
+        const rowH = Math.max(descH + 6, 18);
+        if (ty + rowH > 760) { doc.addPage(); ty = 50; }
+        const rowBg = idx % 2 === 1 ? '#f9f9f9' : '#ffffff';
+        doc.rect(leftM, ty - 3, tableW, rowH).fillAndStroke(rowBg, '#999999');
+        doc.fillColor('#000000');
+        doc.text(String(idx + 1),                     cols.pos   + rowPadX, ty, { width: colW.pos   - rowPadX, align: 'left' });
+        doc.text(item.description,                    cols.desc  + rowPadX, ty, { width: colW.desc  - rowPadX, align: 'left' });
+        doc.text(String(item.hours).replace('.', ','), cols.qty  + rowPadX, ty, { width: colW.qty   - rowPadX * 2, align: 'center' });
+        doc.text('Stunden',                           cols.unit  + rowPadX, ty, { width: colW.unit  - rowPadX, align: 'left' });
+        doc.text(fmtEur(item.rate),                   cols.price + rowPadX, ty, { width: colW.price - rowPadX, align: 'right' });
+        doc.text(fmtEur(item.amount),                 cols.total + rowPadX, ty, { width: colW.total - rowPadX, align: 'right' });
+        drawRowDividers(ty - 3, rowH);
+        ty += rowH;
+      });
+
+      // Summe row
+      doc.font(FB).fontSize(9);
+      const sumH = 20;
+      doc.rect(leftM, ty - 3, tableW, sumH).fillAndStroke('#e8e8e8', '#999999');
+      doc.fillColor('#000000');
+      doc.text('Summe', cols.pos + rowPadX, ty, { width: colW.pos + colW.desc + colW.qty + colW.unit + colW.price - rowPadX });
+      doc.text(fmtEur(invoice.total), cols.total + rowPadX, ty, { width: colW.total - rowPadX, align: 'right' });
+      drawRowDividers(ty - 3, sumH);
+      ty += sumH + 20;
+
+      // Note
+      doc.font(F).fontSize(9);
+      const note = s.invoice_note || '';
+      if (note) { doc.text(`Hinweis: ${note}`, leftM, ty, { width: 495 }); }
+
+      // Footer — bank details at page bottom
+      const bankLine = [s.bank_name, s.bank_bic ? `BIC ${s.bank_bic}` : '', s.bank_iban ? `IBAN ${s.bank_iban}` : ''].filter(Boolean).join(' | ');
+      if (bankLine) {
+        const savedBottom = doc.page.margins.bottom;
+        doc.page.margins.bottom = 0;
+        doc.fontSize(8).text(`Bankverbindung: ${bankLine}`, leftM, doc.page.height - 30, { width: 495, align: 'center' });
+        doc.page.margins.bottom = savedBottom;
+      }
+
+      doc.end();
+    });
   }
 
   // === PLANIO INTEGRATION ===
