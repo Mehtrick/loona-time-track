@@ -867,9 +867,22 @@ describe('Invoices API', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/zip/);
     expect(res.headers['content-disposition']).toContain('Rechnungen.zip');
+
+    const zipBuf = res.body;
     // ZIP magic bytes: PK\x03\x04
-    expect(res.body[0]).toBe(0x50); // 'P'
-    expect(res.body[1]).toBe(0x4b); // 'K'
+    expect(zipBuf[0]).toBe(0x50); // 'P'
+    expect(zipBuf[1]).toBe(0x4b); // 'K'
+
+    // Dateinamen sind in ZIP-Headern immer im Klartext gespeichert (unabhängig von Kompression)
+    expect(zipBuf.includes(Buffer.from('Rechnung_ZIP001.pdf'))).toBe(true);
+    expect(zipBuf.includes(Buffer.from('Rechnung_ZIP002.pdf'))).toBe(true);
+
+    // Anzahl der Local-File-Header-Signaturen entspricht Anzahl der Einträge
+    const PK_LOCAL = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+    let count = 0;
+    let idx = 0;
+    while ((idx = zipBuf.indexOf(PK_LOCAL, idx)) !== -1) { count++; idx += 4; }
+    expect(count).toBe(2);
   });
 
   it('POST /api/invoices returns 400 for missing fields', async () => {
