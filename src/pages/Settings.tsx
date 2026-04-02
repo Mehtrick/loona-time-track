@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Save, Info, Download, Upload, AlertTriangle, X, Lock, LockOpen, KeyRound, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Save, Info, Download, Upload, AlertTriangle, X, Lock, LockOpen, KeyRound, Eye, EyeOff, Loader2, User, Landmark, FileText, ShieldCheck, Database } from 'lucide-react'
 import { api } from '../api'
 import { useToast } from '../components/Toast'
 import type { Settings as SettingsType } from '../types'
@@ -9,6 +9,95 @@ const INPUT_ERR = "w-full bg-night-800 border border-red-500/70 rounded-xl px-4 
 const LABEL = "block text-sm font-medium text-night-200 mb-1.5"
 
 const KLEINUNTERNEHMER_TEXT = 'Abrechnung nach § 19 Abs. 1 UStG ohne Umsatzsteuer (Kleinunternehmerregelung)'
+
+const NAV_SECTIONS = [
+  { id: 'absender', label: 'Absender', Icon: User },
+  { id: 'bankverbindung', label: 'Bankverbindung', Icon: Landmark },
+  { id: 'rechnungseinstellungen', label: 'Rechnung', Icon: FileText },
+  { id: 'verschluesselung', label: 'Verschlüsselung', Icon: ShieldCheck },
+  { id: 'datensicherung', label: 'Datensicherung', Icon: Database },
+] as const
+
+const NAV_SECTION_IDS = NAV_SECTIONS.map(n => n.id) as string[]
+
+function useActiveSection(ids: readonly string[]) {
+  const [active, setActive] = useState(ids[0])
+
+  useEffect(() => {
+    // Scrollbaren Eltern-Container ermitteln (das <main>-Element mit overflow-y-auto)
+    const scrollRoot = document.querySelector('main') ?? null
+    let observers: IntersectionObserver[] = []
+
+    function disconnectObservers() {
+      observers.forEach(o => o.disconnect())
+      observers = []
+    }
+
+    function createObservers() {
+      disconnectObservers()
+      const rootHeight =
+        scrollRoot instanceof HTMLElement
+          ? scrollRoot.getBoundingClientRect().height
+          : window.innerHeight
+      const topMargin = Math.round(rootHeight * 0.1)
+      const bottomMargin = Math.round(rootHeight * 0.6)
+      const rootMargin = `-${topMargin}px 0px -${bottomMargin}px 0px`
+
+      ids.forEach(id => {
+        const el = document.getElementById(id)
+        if (!el) return
+        const observer = new IntersectionObserver(
+          ([entry]) => {
+            if (entry.isIntersecting) setActive(id)
+          },
+          { root: scrollRoot, rootMargin, threshold: 0 }
+        )
+        observer.observe(el)
+        observers.push(observer)
+      })
+    }
+
+    createObservers()
+    window.addEventListener('resize', createObservers)
+
+    return () => {
+      window.removeEventListener('resize', createObservers)
+      disconnectObservers()
+    }
+  }, [ids])
+
+  return active
+}
+
+function SettingsToc({ activeId }: { activeId: string }) {
+  function scrollTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  return (
+    <nav className="sticky top-8 flex flex-col gap-1">
+      <p className="text-xs font-semibold text-night-500 uppercase tracking-wider mb-2 px-2">Auf dieser Seite</p>
+      {NAV_SECTIONS.map(({ id, label, Icon }) => {
+        const isActive = activeId === id
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => scrollTo(id)}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left transition-all duration-150 w-full ${
+              isActive
+                ? 'bg-loona-600/15 text-loona-300 border-l-2 border-loona-500'
+                : 'text-night-400 hover:text-night-100 hover:bg-night-800 border-l-2 border-transparent'
+            }`}
+          >
+            <Icon size={14} className={isActive ? 'text-loona-400' : 'text-night-500'} />
+            {label}
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
 
 const ENTITY_LABELS: Record<string, string> = {
   clients: 'Kunden',
@@ -162,6 +251,7 @@ function validateIBAN(raw: string): boolean {
 
 export default function Settings() {
   const { toast } = useToast()
+  const activeSection = useActiveSection(NAV_SECTION_IDS)
   const [s, setS] = useState<SettingsType>({})
   const [taxError, setTaxError] = useState('')
   const [ibanError, setIbanError] = useState('')
@@ -304,7 +394,9 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="flex gap-10 items-start">
+      {/* Hauptinhalt */}
+      <div className="flex-1 min-w-0 space-y-8 max-w-3xl">
       {pendingImport && (
         <ConflictDialog
           conflicts={pendingImport.conflicts}
@@ -320,7 +412,7 @@ export default function Settings() {
 
       <form onSubmit={handleSave} className="space-y-8">
         {/* Absender */}
-        <section className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-4">
+        <section id="absender" className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-4">
           <h3 className="text-lg font-semibold text-white">Absender</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
@@ -357,7 +449,7 @@ export default function Settings() {
         </section>
 
         {/* Bankverbindung */}
-        <section className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-4">
+        <section id="bankverbindung" className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-4">
           <h3 className="text-lg font-semibold text-white">Bankverbindung</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -382,7 +474,7 @@ export default function Settings() {
         </section>
 
         {/* Rechnungseinstellungen */}
-        <section className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-4">
+        <section id="rechnungseinstellungen" className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-4">
           <h3 className="text-lg font-semibold text-white">Rechnungseinstellungen</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -426,7 +518,7 @@ export default function Settings() {
       </form>
 
       {/* Verschlüsselung */}
-      <section className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-5">
+      <section id="verschluesselung" className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-5">
         <div className="flex items-start gap-3">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${encryptionEnabled ? 'bg-loona-600/20' : 'bg-night-800'}`}>
             {encryptionEnabled
@@ -539,7 +631,7 @@ export default function Settings() {
       </section>
 
       {/* Daten-Export / Import */}
-      <section className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-5">
+      <section id="datensicherung" className="bg-night-900 rounded-2xl border border-night-700/50 p-6 space-y-5">
         <div>
           <h3 className="text-lg font-semibold text-white">Daten sichern & wiederherstellen</h3>
           <p className="text-night-400 text-sm mt-1">
@@ -581,6 +673,12 @@ export default function Settings() {
           Der Export enthält alle Kunden, Tickets, Buchungen und Rechnungen im Klartext (unverschlüsselt). Bewahre die Datei sicher auf.
         </p>
       </section>
+      </div>{/* Ende Hauptinhalt */}
+
+      {/* Rechte Inhaltsnavigation */}
+      <div className="hidden lg:block w-44 flex-shrink-0 self-stretch">
+        <SettingsToc activeId={activeSection} />
+      </div>
     </div>
   )
 }
