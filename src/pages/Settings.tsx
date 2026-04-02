@@ -24,24 +24,46 @@ function useActiveSection(ids: readonly string[]) {
   const [active, setActive] = useState(ids[0])
 
   useEffect(() => {
-    // Find the scrollable parent (the <main> element with overflow-y-auto)
+    // Scrollbaren Eltern-Container ermitteln (das <main>-Element mit overflow-y-auto)
     const scrollRoot = document.querySelector('main') ?? null
-    const observers: IntersectionObserver[] = []
+    let observers: IntersectionObserver[] = []
 
-    ids.forEach(id => {
-      const el = document.getElementById(id)
-      if (!el) return
-      const observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) setActive(id)
-        },
-        { root: scrollRoot, rootMargin: '-10% 0px -60% 0px', threshold: 0 }
-      )
-      observer.observe(el)
-      observers.push(observer)
-    })
+    function disconnectObservers() {
+      observers.forEach(o => o.disconnect())
+      observers = []
+    }
 
-    return () => observers.forEach(o => o.disconnect())
+    function createObservers() {
+      disconnectObservers()
+      const rootHeight =
+        scrollRoot instanceof HTMLElement
+          ? scrollRoot.getBoundingClientRect().height
+          : window.innerHeight
+      const topMargin = Math.round(rootHeight * 0.1)
+      const bottomMargin = Math.round(rootHeight * 0.6)
+      const rootMargin = `-${topMargin}px 0px -${bottomMargin}px 0px`
+
+      ids.forEach(id => {
+        const el = document.getElementById(id)
+        if (!el) return
+        const observer = new IntersectionObserver(
+          ([entry]) => {
+            if (entry.isIntersecting) setActive(id)
+          },
+          { root: scrollRoot, rootMargin, threshold: 0 }
+        )
+        observer.observe(el)
+        observers.push(observer)
+      })
+    }
+
+    createObservers()
+    window.addEventListener('resize', createObservers)
+
+    return () => {
+      window.removeEventListener('resize', createObservers)
+      disconnectObservers()
+    }
   }, [ids])
 
   return active
@@ -373,7 +395,7 @@ export default function Settings() {
 
   return (
     <div className="flex gap-10 items-start">
-      {/* Main content */}
+      {/* Hauptinhalt */}
       <div className="flex-1 min-w-0 space-y-8 max-w-3xl">
       {pendingImport && (
         <ConflictDialog
@@ -651,9 +673,9 @@ export default function Settings() {
           Der Export enthält alle Kunden, Tickets, Buchungen und Rechnungen im Klartext (unverschlüsselt). Bewahre die Datei sicher auf.
         </p>
       </section>
-      </div>{/* end main content */}
+      </div>{/* Ende Hauptinhalt */}
 
-      {/* Right TOC navigation */}
+      {/* Rechte Inhaltsnavigation */}
       <div className="hidden lg:block w-44 flex-shrink-0 self-stretch">
         <SettingsToc activeId={activeSection} />
       </div>

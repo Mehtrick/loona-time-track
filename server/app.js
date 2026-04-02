@@ -472,25 +472,24 @@ export function createApp(dataFilePath) {
     const year = new Date().getFullYear().toString();
     const last = lastNumber != null ? String(lastNumber) : '';
 
-    // Format: YYYY-NNNNN (e.g. "2026-00001" → "2026-00002")
-    const dashMatch = last && last.match(/^(\d{4})-(\d+)$/);
+    // Format: YYYY-NNNNN (z. B. "2026-00001" → "2026-00002")
+    const dashMatch = last && last.match(/^(\d{4})-(\d{5})$/);
     if (dashMatch) {
       const [, lastYear, numStr] = dashMatch;
-      const padLen = numStr.length;
       if (lastYear === year) {
-        return year + '-' + String(parseInt(numStr, 10) + 1).padStart(padLen, '0');
+        return year + '-' + String(parseInt(numStr, 10) + 1).padStart(5, '0');
       }
-      // New year: reset counter, preserve padding length
-      return year + '-' + '1'.padStart(padLen, '0');
+      // Neues Jahr: Zähler zurücksetzen, 5 Stellen beibehalten
+      return year + '-' + '1'.padStart(5, '0');
     }
 
-    // Format: YYYYnnnnnn (e.g. "2026000001" → "2026000002")
+    // Format: YYYYnnnnnn (z. B. "2026000001" → "2026000002")
     if (last && last.startsWith(year)) {
       const num = parseInt(last.slice(4), 10);
       return year + String(num + 1).padStart(6, '0');
     }
 
-    // Plain integer (e.g. "42" → "43")
+    // Reine Ganzzahl (z. B. "42" → "43")
     if (last && /^\d+$/.test(last)) {
       return String(parseInt(last, 10) + 1);
     }
