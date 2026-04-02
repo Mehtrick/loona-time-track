@@ -23,6 +23,10 @@ export function getPdfUrl(invoiceId: number): string {
   return `${BASE}/invoices/${invoiceId}/pdf`
 }
 
+export function getDownloadAllUrl(): string {
+  return `${BASE}/invoices/download-all`
+}
+
 export const api = {
   // Clients
   getClients: () => request<any[]>('/clients'),

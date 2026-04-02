@@ -839,6 +839,39 @@ describe('Invoices API', () => {
     expect(res.body.length).toBeGreaterThan(100);
   });
 
+  it('GET /api/invoices/download-all returns 404 when no invoices exist', async () => {
+    const res = await request(app).get('/api/invoices/download-all');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBeDefined();
+  });
+
+  it('GET /api/invoices/download-all returns a ZIP with all invoice PDFs', async () => {
+    // Setup: two clients, one invoice each
+    await request(app).post('/api/clients').send({ name: 'Client A', address_line1: 'Str. 1', address_line2: '10115 Berlin' });
+    await request(app).post('/api/clients').send({ name: 'Client B', address_line1: 'Str. 2', address_line2: '80331 München' });
+    await request(app).post('/api/entries').send({ client_id: 1, date: '2026-01-01', hours: 2, description: 'Arbeit A' });
+    await request(app).post('/api/entries').send({ client_id: 2, date: '2026-01-02', hours: 1, description: 'Arbeit B' });
+    await request(app).post('/api/invoices').send({
+      client_id: 1, invoice_number: 'ZIP001', date: '2026-01-15', due_date: '2026-01-29', hourly_rate: 100, entry_ids: [1],
+    });
+    await request(app).post('/api/invoices').send({
+      client_id: 2, invoice_number: 'ZIP002', date: '2026-01-16', due_date: '2026-01-30', hourly_rate: 80, entry_ids: [2],
+    });
+
+    const res = await request(app).get('/api/invoices/download-all').buffer(true).parse((r, cb) => {
+      const chunks = [];
+      r.on('data', c => chunks.push(c));
+      r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/zip/);
+    expect(res.headers['content-disposition']).toContain('Rechnungen.zip');
+    // ZIP magic bytes: PK\x03\x04
+    expect(res.body[0]).toBe(0x50); // 'P'
+    expect(res.body[1]).toBe(0x4b); // 'K'
+  });
+
   it('POST /api/invoices returns 400 for missing fields', async () => {
     const res = await request(app).post('/api/invoices').send({ client_id: 1 });
     expect(res.status).toBe(400);

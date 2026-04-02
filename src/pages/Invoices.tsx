@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Receipt, Plus, Trash2, FileDown, X, Check } from 'lucide-react'
-import { api, getPdfUrl } from '../api'
+import { Receipt, Plus, Trash2, FileDown, FolderDown, X, Check } from 'lucide-react'
+import { api, getPdfUrl, getDownloadAllUrl } from '../api'
 import { useToast } from '../components/Toast'
 import type { Client, Invoice, TimeEntry } from '../types'
 
@@ -173,13 +173,26 @@ export default function Invoices() {
           <p className="text-night-300 mt-1">Rechnungen erstellen und verwalten</p>
         </div>
         {!showForm && (
-          <button
-            onClick={openForm}
-            className="flex items-center gap-2 px-4 py-2.5 bg-loona-600 hover:bg-loona-500 text-white rounded-xl text-sm font-medium transition-loona loona-glow-hover"
-          >
-            <Plus size={16} />
-            Neue Rechnung
-          </button>
+          <div className="flex items-center gap-2">
+            {invoices.length > 0 && (
+              <a
+                href={getDownloadAllUrl()}
+                download="Rechnungen.zip"
+                className="flex items-center gap-2 px-4 py-2.5 bg-night-800 hover:bg-night-700 text-night-200 hover:text-white border border-night-600/50 rounded-xl text-sm font-medium transition-loona"
+                title="Alle Rechnungen als ZIP herunterladen"
+              >
+                <FolderDown size={16} />
+                Alle herunterladen
+              </a>
+            )}
+            <button
+              onClick={openForm}
+              className="flex items-center gap-2 px-4 py-2.5 bg-loona-600 hover:bg-loona-500 text-white rounded-xl text-sm font-medium transition-loona loona-glow-hover"
+            >
+              <Plus size={16} />
+              Neue Rechnung
+            </button>
+          </div>
         )}
       </div>
 
