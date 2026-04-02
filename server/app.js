@@ -519,25 +519,48 @@ export function createApp(dataFilePath) {
     const s = data.settings || {};
     const archive = archiver('zip', { zlib: { level: 6 } });
 
+    // Client-Map für O(1)-Nachschlag statt O(n*m)
+    const clientMap = new Map(data.clients.map(c => [c.id, c]));
+
+    let zipFehler = null;
+    const handleZipError = err => {
+      if (zipFehler) return;
+      zipFehler = err;
+      console.error('ZIP-Fehler:', err);
+      try { archive.abort(); } catch { /* ignore */ }
+      if (!res.headersSent) return res.status(500).json({ error: 'ZIP-Download fehlgeschlagen' });
+      if (!res.destroyed) res.destroy(err);
+    };
+
     res.set({
       'Content-Type': 'application/zip',
       'Content-Disposition': 'attachment; filename="Rechnungen.zip"',
     });
 
+    archive.on('error', handleZipError);
     archive.pipe(res);
-    archive.on('error', err => { console.error('ZIP-Fehler:', err); });
 
     for (const invoice of data.invoices) {
-      const client = data.clients.find(c => c.id === invoice.client_id);
+      if (zipFehler || res.destroyed) break;
+      const client = clientMap.get(invoice.client_id);
+      // Zip-Slip-Schutz: nur alphanumerische Zeichen, Bindestrich und Unterstrich erlaubt
+      const safeName = String(invoice.invoice_number).replace(/[^a-zA-Z0-9\-_]/g, '_');
       try {
         const pdf = await buildInvoicePdf(invoice, client, s);
-        archive.append(pdf, { name: `Rechnung_${invoice.invoice_number}.pdf` });
+        if (zipFehler || res.destroyed) break;
+        archive.append(pdf, { name: `Rechnung_${safeName}.pdf` });
       } catch (err) {
-        console.error(`PDF-Generierung fehlgeschlagen für Rechnung ${invoice.invoice_number}:`, err);
+        handleZipError(err);
+        break;
       }
     }
 
-    await archive.finalize();
+    if (zipFehler || res.destroyed) return;
+    try {
+      await archive.finalize();
+    } catch (err) {
+      handleZipError(err);
+    }
   });
 
   app.get('/api/invoices', (req, res) => {
@@ -553,7 +576,7 @@ export function createApp(dataFilePath) {
   app.get('/api/invoices/:id', (req, res) => {
     const data = loadData();
     const invoice = data.invoices.find(i => i.id === Number(req.params.id));
-    if (!invoice) return res.status(404).json({ error: 'Not found' });
+    if (!invoice) return res.status(404).json({ error: 'Rechnung nicht gefunden' });
     const client = data.clients.find(c => c.id === invoice.client_id);
     res.json({ ...invoice, client_name: client?.name || '', client_color: client?.color || '#666' });
   });
@@ -658,14 +681,16 @@ export function createApp(dataFilePath) {
   app.get('/api/invoices/:id/pdf', async (req, res) => {
     const data = loadData();
     const invoice = data.invoices.find(i => i.id === Number(req.params.id));
-    if (!invoice) return res.status(404).json({ error: 'Not found' });
+    if (!invoice) return res.status(404).json({ error: 'Rechnung nicht gefunden' });
     const client = data.clients.find(c => c.id === invoice.client_id);
     const s = data.settings || {};
     try {
       const pdf = await buildInvoicePdf(invoice, client, s);
+      // Zip-Slip-Schutz: nur sichere Zeichen im Dateinamen
+      const safeName = String(invoice.invoice_number).replace(/[^a-zA-Z0-9\-_]/g, '_');
       res.set({
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="Rechnung_${invoice.invoice_number}.pdf"`,
+        'Content-Disposition': `inline; filename="Rechnung_${safeName}.pdf"`,
         'Content-Length': pdf.length,
       });
       res.send(pdf);
@@ -685,7 +710,12 @@ export function createApp(dataFilePath) {
   }
 
   async function buildInvoicePdf(invoice, client, s) {
-    const PDFDocument = (await import('pdfkit')).default;
+    let PDFDocument;
+    try {
+      PDFDocument = (await import('pdfkit')).default;
+    } catch {
+      throw new Error('PDF-Bibliothek (pdfkit) nicht verfügbar');
+    }
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
