@@ -42,6 +42,7 @@ export default function Invoices() {
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<number>>(new Set())
   const [creating, setCreating] = useState(false)
+  const [filterClientId, setFilterClientId] = useState<number | null>(null)
 
   function load() {
     api.getInvoices().then(setInvoices).catch(() => toast('Fehler beim Laden der Rechnungen.', 'error'))
@@ -360,8 +361,39 @@ export default function Invoices() {
           </button>
         </div>
       ) : (
+        <>
+          {/* Client filter */}
+          {invoices.length > 0 && (() => {
+            const uniqueClients = Array.from(
+              new Map(invoices.map(inv => [inv.client_id, { id: inv.client_id, name: inv.client_name, color: inv.client_color }])).values()
+            ).sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+            if (uniqueClients.length < 2) return null
+            return (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-night-400">Kunde:</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setFilterClientId(null)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-loona ${filterClientId === null ? 'bg-loona-600 text-white' : 'bg-night-800 text-night-300 hover:text-white hover:bg-night-700'}`}
+                  >
+                    Alle
+                  </button>
+                  {uniqueClients.map(c => (
+                    <button
+                      key={c.id}
+                      onClick={() => setFilterClientId(c.id === filterClientId ? null : c.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-loona ${filterClientId === c.id ? 'bg-loona-600 text-white' : 'bg-night-800 text-night-300 hover:text-white hover:bg-night-700'}`}
+                    >
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#6b1ae6' }} />
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
         <div className="grid gap-3">
-          {invoices.map(inv => (
+          {invoices.filter(inv => filterClientId === null || inv.client_id === filterClientId).map(inv => (
             <div
               key={inv.id}
               className="bg-night-900 rounded-xl border border-night-700/50 px-6 py-4 flex items-center justify-between hover:bg-night-850 transition-loona"
@@ -400,6 +432,7 @@ export default function Invoices() {
             </div>
           ))}
         </div>
+        </>
       )}
     </div>
   )
